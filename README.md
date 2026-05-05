@@ -506,11 +506,3 @@ Frontend: `npm run dev -- -p 3001`
 
 ## License & academic integrity
 
-This is a Final Year Project for **The University of Lahore**, Department of Computer Science & IT, Fall 2025.
-
-Group members:
-* Muhammad Abdul Basit Malik (70138503)
-* Zainab Riaz Ahmed (70134992)
-* Orooj Fatima (70138650)
-
-Project advisor: Ma'am Sadaf Ali.
