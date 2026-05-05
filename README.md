@@ -2,7 +2,7 @@
 
 > Smart Parking Surveillance & Recognition System combining **License Plate Recognition (OCR)** and **Biometric (Face) Authentication** to automate vehicle access control.
 
-This is the implementation of the FYP titled *Biometric Parking System* (Project ID: Fall-2025-09).
+
 
 ---
 
