@@ -504,5 +504,4 @@ Frontend: `npm run dev -- -p 3001`
 
 ---
 
-## License & academic integrity
 
