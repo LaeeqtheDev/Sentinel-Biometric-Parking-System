@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----- Color tokens (used in inline styles for noise overlays etc.) ----- */
+:root {
+  --bg: #08080a;
+  --surface: #13131a;
+  --border: #1f1f2a;
+  --amber: #fbbf24;
+  --amber-glow: #fde047;
+}
+
+/* ----- Base ----- */
+html,
+body {
+  background: var(--bg);
+  color: #e8e8ea;
+  font-feature-settings: 'cv11', 'ss01';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(251, 191, 36, 0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(251, 191, 36, 0.03), transparent);
+  min-height: 100vh;
+}
+
+/* ----- Subtle scanlines for the surveillance vibe ----- */
+.scanlines {
+  position: relative;
+}
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.015) 0px,
+    rgba(255, 255, 255, 0.015) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ----- Pretty scrollbar ----- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #26262f;
+  border-radius: 4px;
+  border: 2px solid #08080a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a47;
+}
+
+/* ----- Custom utilities ----- */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .glow-amber {
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.2),
+      0 0 24px 0 rgba(251, 191, 36, 0.15);
+  }
+  .glow-amber-strong {
+    box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.4),
+      0 0 32px 4px rgba(251, 191, 36, 0.25);
+  }
+  .border-grid {
+    background-image: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.04) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}
+
+/* ----- Form elements default styling ----- */
+input,
+textarea,
+select {
+  background: transparent;
+  color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #5a5a64;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}

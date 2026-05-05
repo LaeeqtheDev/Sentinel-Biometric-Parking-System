@@ -1,0 +1,21 @@
+# Django Core
+Django==5.0.6
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+python-decouple==3.8
+
+# Image / Image Processing
+Pillow==10.3.0
+opencv-python==4.10.0.84
+numpy==1.26.4
+
+# OCR (License Plate Recognition)
+pytesseract==0.3.10
+
+# Face Recognition (Biometric)
+# NOTE: face_recognition depends on `dlib`. See README for OS-specific install steps.
+face-recognition==1.3.0
+
+# Utilities
+python-dateutil==2.9.0.post0
