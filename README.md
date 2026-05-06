@@ -1,14 +1,22 @@
 # Sentinel · Biometric Parking System
 
-A smart parking surveillance & recognition system built as a Final-Year
-Project at the University of Lahore. It combines **license-plate OCR**
-with **device-based biometric verification (WebAuthn passkeys)** plus a
-**face-recognition fallback** to control access to a parking lot, and
-tracks every vehicle's stay as a parking session.
+> Smart Parking Surveillance & Recognition System combining **License Plate Recognition (OCR)** and **Biometric (Face) Authentication** to automate vehicle access control.
 
-> **Group · Fall-2025-09**
-> Muhammad Abdul Basit Malik · Zainab Riaz Ahmed · Orooj Fatima
-> Advisor · Ma'am Sadaf Ali
+This is the implementation of the FYP titled *Biometric Parking System* (Project ID: Fall-2025-09).
+
+---
+
+## Table of contents
+
+1. [What's inside](#whats-inside)
+2. [Tech stack](#tech-stack)
+3. [Prerequisites](#prerequisites)
+4. [Setup — step by step (first-time Python user friendly)](#setup--step-by-step-first-time-python-user-friendly)
+5. [Daily development workflow](#daily-development-workflow)
+6. [Project walkthrough / how to demo](#project-walkthrough--how-to-demo)
+7. [API reference](#api-reference)
+8. [Folder structure](#folder-structure)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -248,64 +256,78 @@ pip install dlib-bin
 pip install face-recognition==1.3.0 --no-deps
 ```
 
-**`(venv)` doesn't appear in your prompt**
-Activation script didn't run. On PowerShell:
+**Option B — install Visual Studio C++ build tools:**
+1. Install **Visual Studio Build Tools 2022** with the *Desktop development with C++* workload from <https://visualstudio.microsoft.com/downloads/>.
+2. Restart your terminal.
+3. Re-run `pip install -r requirements.txt`.
+
+**Option C — use conda instead of pip (works on every OS):**
+```bash
+conda create -n parking python=3.11
+conda activate parking
+conda install -c conda-forge dlib
+pip install -r requirements.txt
 ```
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-.\venv\Scripts\Activate.ps1
+
+### Tesseract not found
+
+```
+TesseractNotFoundError: tesseract is not installed or it's not in your PATH
 ```
 
-**WebAuthn fails with "operation not allowed"**
-WebAuthn requires either `https://` or `localhost`. Don't access via
-`127.0.0.1` if the RP_ID is `localhost`. Make sure your backend
-`WEBAUTHN_ORIGINS` matches the URL the browser uses.
+Set the full path in `backend/.env`:
+```
+TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe
+```
+Then restart the Django server.
 
-**Camera doesn't work in browser**
-WebAuthn + getUserMedia both require a secure context. `localhost` is
-secure, anything else needs HTTPS.
+### CORS errors in the browser console
 
-**`pytesseract.TesseractNotFoundError`**
-Set `TESSERACT_CMD` in `.env` to the full path of `tesseract.exe`.
+By default the backend allows requests from `http://localhost:3000` and `http://127.0.0.1:3000`. If you run the frontend on a different port, edit `CORS_ALLOWED_ORIGINS` in `backend/.env`.
+
+### Webcam doesn't show up
+
+* Browsers only allow camera access on `localhost` or `https://`. `http://192.168.x.x:3000` will be blocked.
+* On first use, the browser will prompt for permission — make sure to allow it.
+* If the webcam is busy in another app (Zoom, Skype), close that app first.
+
+### "No face detected"
+
+* Make sure your face is well-lit and roughly fills the frame.
+* Remove glasses if reflections are heavy.
+* Try moving slightly closer to the camera.
+
+### "License plate could not be read"
+
+OCR is not magic — it depends heavily on image quality. Tips:
+* Use a clear, in-focus, well-lit photo.
+* The plate should be roughly horizontal and not tilted.
+* For demos, you can bypass OCR by sending `plate_number` directly to `/api/access/verify-entry/` instead of `plate_image_base64`.
+
+### `npm install` fails
+
+```bash
+npm cache clean --force
+rm -rf node_modules package-lock.json   # or `del /s` on Windows
+npm install
+```
+
+### Server won't start: `Error: That port is already in use`
+
+Backend:  `python manage.py runserver 8001`
+Frontend: `npm run dev -- -p 3001`
+
+(Don't forget to update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` if you change the backend port, and `CORS_ALLOWED_ORIGINS` in `backend/.env` if you change the frontend port.)
 
 ---
 
-## Project layout
+## License & academic integrity
 
-```
-backend/
-├── core/           Django config (settings, urls, wsgi)
-├── accounts/       Custom User (with role: ADMIN | DRIVER) + JWT
-├── vehicles/       Vehicle + UserVehicle (M2M) + plate normalisation
-├── biometrics/     face_recognition encodings (fallback auth)
-├── passkeys/       WebAuthn credentials + pickup tokens
-├── parking/        ParkingSession (entry/exit lifecycle)
-├── access/         AccessLog + verify-entry, verify-exit, live-detect
-├── recognition/    plate_ocr.py (Tesseract) + face_engine.py
-└── manage.py
+This is a Final Year Project for **The University of Lahore**, Department of Computer Science & IT, Fall 2025.
 
-frontend/
-└── src/
-    ├── app/
-    │   ├── login/                 admin login
-    │   ├── dashboard/             admin shell
-    │   │   ├── page.tsx           overview + stats
-    │   │   ├── live-camera/       continuous OCR feed
-    │   │   ├── entry/             manual ENTRY/EXIT verification
-    │   │   ├── sessions/          parking sessions + QR pickup
-    │   │   ├── vehicles/          CRUD + assignments management
-    │   │   ├── users/             user CRUD + biometric enrollment
-    │   │   └── logs/              audit log
-    │   └── driver/                mobile-first driver dashboard
-    │       ├── login/
-    │       ├── page.tsx           home / my vehicles
-    │       ├── biometric/         passkey enrollment
-    │       ├── pickup/            tap-to-exit
-    │       ├── sessions/          parking history
-    │       └── scan/[token]/      kiosk-QR landing page
-    ├── components/                Sidebar, Topbar, Webcam, Button, …
-    └── lib/
-        ├── api.ts                 fetch wrapper + JWT auto-refresh
-        ├── auth.tsx               auth context
-        ├── webauthn.ts            @simplewebauthn/browser wrapper
-        └── utils.ts               types + date / duration helpers
-```
+Group members:
+* Muhammad Abdul Basit Malik (70138503)
+* Zainab Riaz Ahmed (70134992)
+* Orooj Fatima (70138650)
+
+Project advisor: Ma'am Sadaf Ali.
