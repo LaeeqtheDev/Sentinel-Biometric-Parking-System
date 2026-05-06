@@ -14,6 +14,7 @@ class AccessLogSerializer(serializers.ModelSerializer):
         model = AccessLog
         fields = (
             "id",
+            "event_type",
             "plate_detected",
             "vehicle",
             "vehicle_detail",
@@ -23,7 +24,10 @@ class AccessLogSerializer(serializers.ModelSerializer):
             "reason",
             "plate_match",
             "biometric_match",
+            "webauthn_match",
             "biometric_distance",
+            "confidence",
+            "via",
             "snapshot",
             "timestamp",
         )

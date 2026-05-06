@@ -7,27 +7,19 @@ from .models import AccessLog
 class AccessLogAdmin(admin.ModelAdmin):
     list_display = (
         "timestamp",
+        "event_type",
         "plate_detected",
         "status",
         "plate_match",
         "biometric_match",
+        "webauthn_match",
+        "confidence",
         "user",
-        "reason",
+        "via",
     )
-    list_filter = ("status", "plate_match", "biometric_match")
+    list_filter = ("event_type", "status", "via", "confidence")
     search_fields = ("plate_detected", "user__username", "vehicle__plate_number")
-    readonly_fields = (
-        "plate_detected",
-        "vehicle",
-        "user",
-        "status",
-        "reason",
-        "plate_match",
-        "biometric_match",
-        "biometric_distance",
-        "snapshot",
-        "timestamp",
-    )
+    readonly_fields = tuple(f.name for f in AccessLog._meta.fields)
 
     def has_add_permission(self, request):
         return False

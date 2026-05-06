@@ -14,6 +14,8 @@ urlpatterns = [
     path("api/vehicles/", include("vehicles.urls")),
     path("api/biometrics/", include("biometrics.urls")),
     path("api/access/", include("access.urls")),
+    path("api/parking/", include("parking.urls")),
+    path("api/passkeys/", include("passkeys.urls")),
 ]
 
 if settings.DEBUG:

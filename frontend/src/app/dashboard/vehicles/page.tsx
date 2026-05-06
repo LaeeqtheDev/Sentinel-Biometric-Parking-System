@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search, Car, Trash2 } from 'lucide-react';
+import { Plus, Search, Car, Trash2, Users } from 'lucide-react';
 import { Topbar } from '@/components/Topbar';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
@@ -88,7 +88,7 @@ export default function VehiclesPage() {
               <tr className="border-b border-ink-700 bg-ink-900/40 text-left">
                 <Th>Plate</Th>
                 <Th>Type</Th>
-                <Th>Owner</Th>
+                <Th>Drivers / Owners</Th>
                 <Th>Make / Model</Th>
                 <Th>Status</Th>
                 <Th>Registered</Th>
@@ -134,13 +134,35 @@ export default function VehiclesPage() {
                     </span>
                   </Td>
                   <Td>
-                    <span className="text-sm text-bone-200">
-                      {v.owner_detail?.first_name || ''}{' '}
-                      {v.owner_detail?.last_name || ''}
-                      <span className="block text-[11px] text-bone-500">
-                        @{v.owner_detail?.username}
+                    {v.assignments && v.assignments.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {v.assignments.slice(0, 2).map((a) => (
+                          <div key={a.id} className="text-sm text-bone-200">
+                            @{a.user_detail?.username}
+                            <span
+                              className={`ml-1.5 rounded px-1 py-0.5 font-mono text-[9px] uppercase tracking-wider ${
+                                a.relationship === 'OWNER'
+                                  ? 'bg-amber/10 text-amber'
+                                  : a.relationship === 'BOTH'
+                                  ? 'bg-granted/10 text-granted'
+                                  : 'bg-ink-700 text-bone-400'
+                              }`}
+                            >
+                              {a.relationship}
+                            </span>
+                          </div>
+                        ))}
+                        {v.assignments.length > 2 && (
+                          <p className="text-[11px] text-bone-500">
+                            +{v.assignments.length - 2} more
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-bone-500">
+                        Unassigned
                       </span>
-                    </span>
+                    )}
                   </Td>
                   <Td>
                     <span className="text-sm text-bone-200">
@@ -170,13 +192,22 @@ export default function VehiclesPage() {
                     </span>
                   </Td>
                   <Td className="pr-5 text-right">
-                    <button
-                      onClick={() => remove(v.id)}
-                      className="rounded-md p-1.5 text-bone-500 transition-colors hover:bg-denied/10 hover:text-denied"
-                      title="Delete"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link
+                        href={`/dashboard/vehicles/${v.id}/assignments`}
+                        className="rounded-md p-1.5 text-bone-500 transition-colors hover:bg-amber/10 hover:text-amber"
+                        title="Manage drivers/owners"
+                      >
+                        <Users className="size-4" />
+                      </Link>
+                      <button
+                        onClick={() => remove(v.id)}
+                        className="rounded-md p-1.5 text-bone-500 transition-colors hover:bg-denied/10 hover:text-denied"
+                        title="Delete"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
                   </Td>
                 </tr>
               ))}

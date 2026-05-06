@@ -3,8 +3,9 @@
 from django.contrib.auth import get_user_model
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .permissions import IsAdminRole
@@ -20,6 +21,35 @@ User = get_user_model()
 
 class LoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def register(request):
+    """
+    Public self-registration. Always creates a DRIVER role.
+    Returns user info + JWT tokens so the frontend can auto-login.
+    """
+    data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+    # Force role to DRIVER — admins are never self-registered.
+    data["role"] = User.Role.DRIVER if hasattr(User, "Role") else "DRIVER"
+
+    serializer = UserCreateSerializer(data=data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.save()
+
+    refresh = RefreshToken.for_user(user)
+    refresh["role"] = user.role
+    refresh["username"] = user.username
+
+    return Response(
+        {
+            "user": UserSerializer(user).data,
+            "access": str(refresh.access_token),
+            "refresh": str(refresh),
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["GET"])

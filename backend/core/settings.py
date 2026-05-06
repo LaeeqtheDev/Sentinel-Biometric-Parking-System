@@ -16,7 +16,7 @@ SECRET_KEY = config(
     default="django-insecure-CHANGE-ME-in-production-this-is-just-a-dev-key",
 )
 DEBUG = config("DEBUG", default=True, cast=bool)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,*", cast=Csv())
 
 # ------------------------------------------------------------------ #
 #  Applications
@@ -37,6 +37,8 @@ INSTALLED_APPS = [
     "vehicles",
     "biometrics",
     "access",
+    "parking",
+    "passkeys",
 ]
 
 MIDDLEWARE = [
@@ -145,6 +147,40 @@ CORS_ALLOW_CREDENTIALS = True
 # ------------------------------------------------------------------ #
 TESSERACT_CMD = config("TESSERACT_CMD", default="")
 FACE_MATCH_TOLERANCE = config("FACE_MATCH_TOLERANCE", default=0.6, cast=float)
+
+# Live-OCR debounce: same plate within this many seconds is ignored.
+OCR_DEBOUNCE_SECONDS = config("OCR_DEBOUNCE_SECONDS", default=30, cast=int)
+# Minimum OCR confidence to act on a detection during live mode.
+OCR_MIN_CONFIDENCE = config("OCR_MIN_CONFIDENCE", default="medium")
+
+# Autonomous mode: when True, trusted users' vehicles are auto-granted access
+# from live camera detections without requiring biometric.  Suspicious users
+# and off-hours entries always require biometric regardless.
+AUTONOMOUS_MODE = config("AUTONOMOUS_MODE", default=True, cast=bool)
+
+# ------------------------------------------------------------------ #
+#  WebAuthn (Passkeys)
+# ------------------------------------------------------------------ #
+# Relying-Party identity – MUST match the host the frontend runs on.
+# For local dev: "localhost".  For production: your real domain.
+WEBAUTHN_RP_ID = config("WEBAUTHN_RP_ID", default="localhost")
+WEBAUTHN_RP_NAME = config("WEBAUTHN_RP_NAME", default="Sentinel Parking")
+# Allowed origins (frontend URLs).  Comma-separated.
+WEBAUTHN_ORIGINS = config(
+    "WEBAUTHN_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+    cast=Csv(),
+)
+
+# ------------------------------------------------------------------ #
+#  Pickup token (QR-based mobile pickup)
+# ------------------------------------------------------------------ #
+PICKUP_TOKEN_TTL_SECONDS = config(
+    "PICKUP_TOKEN_TTL_SECONDS", default=300, cast=int
+)  # 5 minutes
+FRONTEND_BASE_URL = config(
+    "FRONTEND_BASE_URL", default="http://localhost:3000"
+)
 
 # Increase upload size to allow base64 images.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB

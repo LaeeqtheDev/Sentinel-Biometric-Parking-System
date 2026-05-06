@@ -10,6 +10,8 @@ import {
   ArrowUpRight,
   Clock,
   Calendar,
+  ParkingCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Topbar } from '@/components/Topbar';
 import { StatCard } from '@/components/StatCard';
@@ -41,8 +43,29 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Alert banner: show if there are recent denials */}
+        {stats && stats.totals.today_denied > 0 && (
+          <div className="flex items-start gap-3 rounded-md border border-denied/30 bg-denied/5 px-4 py-3">
+            <AlertCircle className="mt-0.5 size-5 shrink-0 text-denied" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-denied">
+                {stats.totals.today_denied} denied access{' '}
+                {stats.totals.today_denied === 1 ? 'attempt' : 'attempts'}{' '}
+                today
+              </p>
+              <p className="text-xs text-bone-400">
+                Review them in{' '}
+                <Link href="/dashboard/logs" className="underline">
+                  Access Logs
+                </Link>{' '}
+                — multiple denials may indicate an unauthorized entry attempt.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ----- Stat row ----- */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <StatCard
             label="Today · Total"
             value={stats?.totals.today ?? '—'}
@@ -61,6 +84,12 @@ export default function DashboardPage() {
             value={stats?.totals.today_denied ?? '—'}
             hint="Failed verification today"
             icon={XCircle}
+          />
+          <StatCard
+            label="Currently Parked"
+            value={stats?.active_sessions ?? '—'}
+            hint="Vehicles inside the lot"
+            icon={ParkingCircle}
           />
           <StatCard
             label="Registered Vehicles"

@@ -172,9 +172,17 @@ export default function LogsPage() {
                 {selected.snapshot ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`${MEDIA_URL}${selected.snapshot}`}
+                    src={
+                      selected.snapshot.startsWith('http')
+                        ? selected.snapshot
+                        : `${MEDIA_URL}${selected.snapshot}`
+                    }
                     alt="Snapshot"
                     className="aspect-video w-full object-cover"
+                    onError={(e) => {
+                      // Hide broken image and show fallback
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="grid aspect-video place-items-center bg-ink-900/60 text-bone-500">

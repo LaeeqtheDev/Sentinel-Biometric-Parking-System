@@ -8,6 +8,8 @@ import {
   Users,
   ScrollText,
   ScanLine,
+  Video,
+  ParkingCircle,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
@@ -16,7 +18,9 @@ import { useAuth } from '@/lib/auth';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, exact: true },
-  { href: '/dashboard/entry', label: 'Live Entry', icon: ScanLine },
+  { href: '/dashboard/live-camera', label: 'Live Camera', icon: Video },
+  { href: '/dashboard/entry', label: 'Manual Gate', icon: ScanLine },
+  { href: '/dashboard/sessions', label: 'Sessions', icon: ParkingCircle },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/logs', label: 'Access Logs', icon: ScrollText },
@@ -38,7 +42,7 @@ export function Sidebar() {
             Sentinel
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-bone-500">
-            Parking · v0.1
+            Parking · v0.2
           </span>
         </div>
       </div>

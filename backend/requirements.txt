@@ -13,9 +13,21 @@ numpy==1.26.4
 # OCR (License Plate Recognition)
 pytesseract==0.3.10
 
-# Face Recognition (Biometric)
-# NOTE: face_recognition depends on `dlib`. See README for OS-specific install steps.
-face-recognition==1.3.0
+# Face Recognition (Biometric fallback)
+# IMPORTANT (Windows): the `dlib` source-build needs Visual C++ which most
+# users don't have.  We use `dlib-bin` (pre-built wheels) instead so no
+# compiler is required.  Then face-recognition is installed with --no-deps
+# in the README setup steps so it doesn't try to also pull in dlib.
+dlib-bin==20.0.1
+face-recognition-models==0.3.0
+Click>=8.0
+# Run separately: pip install face-recognition==1.3.0 --no-deps
+
+# WebAuthn / Passkeys (production-grade biometric)
+webauthn==2.5.2
+
+# QR codes for mobile pickup flow
+qrcode==7.4.2
 
 # Utilities
 python-dateutil==2.9.0.post0

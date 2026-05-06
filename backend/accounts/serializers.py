@@ -21,6 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "cnic",
             "role",
+            "trust_level",
             "is_active",
             "has_biometric",
             "created_at",

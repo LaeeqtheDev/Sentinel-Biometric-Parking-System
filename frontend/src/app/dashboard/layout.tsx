@@ -14,10 +14,18 @@ export default function DashboardLayout({
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login');
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    // Hard role enforcement: non-admins get bounced to driver dashboard.
+    if (user.role !== 'ADMIN') {
+      router.replace('/driver');
+    }
   }, [user, loading, router]);
 
-  if (loading || !user) {
+  if (loading || !user || user.role !== 'ADMIN') {
     return (
       <div className="grid min-h-screen place-items-center bg-ink-950">
         <div className="flex flex-col items-center gap-4">
