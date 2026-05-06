@@ -2,7 +2,6 @@
 
 > Smart Parking Surveillance & Recognition System combining **License Plate Recognition (OCR)** and **Biometric (Face) Authentication** to automate vehicle access control.
 
-This is the implementation of the FYP titled *Biometric Parking System* (Project ID: Fall-2025-09).
 
 ---
 
@@ -320,14 +319,3 @@ Frontend: `npm run dev -- -p 3001`
 (Don't forget to update `NEXT_PUBLIC_API_URL` in `frontend/.env.local` if you change the backend port, and `CORS_ALLOWED_ORIGINS` in `backend/.env` if you change the frontend port.)
 
 ---
-
-## License & academic integrity
-
-This is a Final Year Project for **The University of Lahore**, Department of Computer Science & IT, Fall 2025.
-
-Group members:
-* Muhammad Abdul Basit Malik (70138503)
-* Zainab Riaz Ahmed (70134992)
-* Orooj Fatima (70138650)
-
-Project advisor: Ma'am Sadaf Ali.
