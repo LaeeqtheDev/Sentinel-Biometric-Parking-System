@@ -1,14 +1,22 @@
 # Sentinel · Biometric Parking System
 
-A smart parking surveillance & recognition system built as a Final-Year
-Project at the University of Lahore. It combines **license-plate OCR**
-with **device-based biometric verification (WebAuthn passkeys)** plus a
-**face-recognition fallback** to control access to a parking lot, and
-tracks every vehicle's stay as a parking session.
+> Smart Parking Surveillance & Recognition System combining **License Plate Recognition (OCR)** and **Biometric (Face) Authentication** to automate vehicle access control.
 
-> **Group · Fall-2025-09**
-> Muhammad Abdul Basit Malik · Zainab Riaz Ahmed · Orooj Fatima
-> Advisor · Ma'am Sadaf Ali
+This is the implementation of the FYP titled *Biometric Parking System* (Project ID: Fall-2025-09).
+
+---
+
+## Table of contents
+
+1. [What's inside](#whats-inside)
+2. [Tech stack](#tech-stack)
+3. [Prerequisites](#prerequisites)
+4. [Setup — step by step (first-time Python user friendly)](#setup--step-by-step-first-time-python-user-friendly)
+5. [Daily development workflow](#daily-development-workflow)
+6. [Project walkthrough / how to demo](#project-walkthrough--how-to-demo)
+7. [API reference](#api-reference)
+8. [Folder structure](#folder-structure)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
