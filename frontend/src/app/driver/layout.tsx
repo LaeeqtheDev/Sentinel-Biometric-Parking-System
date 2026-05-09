@@ -10,6 +10,8 @@ import {
   History,
   LogOut,
   ShieldCheck,
+  ParkingCircle,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -51,9 +53,10 @@ export default function DriverLayout({
 
   const tabs = [
     { href: '/driver', label: 'Home', icon: Home, exact: true },
-    { href: '/driver/pickup', label: 'Pickup', icon: Car },
-    { href: '/driver/sessions', label: 'History', icon: History },
-    { href: '/driver/biometric', label: 'Passkey', icon: ScanFace },
+    { href: '/driver/vehicles', label: 'Vehicles', icon: Car },
+    { href: '/driver/pickup', label: 'Pickup', icon: ParkingCircle },
+    { href: '/driver/documents', label: 'Docs', icon: FileText },
+    { href: '/driver/biometric', label: 'Biometric', icon: ScanFace },
   ];
 
   return (

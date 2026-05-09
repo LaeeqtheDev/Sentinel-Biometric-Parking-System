@@ -8,7 +8,14 @@ Lifecycle:
 
 Invariant: at most ONE session per vehicle has status=PARKED at any time.
 This makes "duplicate entry" prevention trivial.
+
+Also defines PolicyConfig — system-wide tunables for the gate decision
+engine (peak hours, trust thresholds, biometric-required flags).  Modeled
+as a singleton: there's only one row, anyone can update it, and other apps
+read it via PolicyConfig.current().
 """
+
+from datetime import time
 
 from django.db import models
 from django.utils import timezone
@@ -18,6 +25,86 @@ from vehicles.models import Vehicle
 from access.models import AccessLog
 
 
+# ====================================================================== #
+#  Policy / Rule Engine
+# ====================================================================== #
+class PolicyConfig(models.Model):
+    """
+    Singleton holding system-wide policy.  Use PolicyConfig.current() — it
+    creates the row on first access if missing.
+    """
+
+    # Trust-level thresholds (auto-bucket based on trust_score)
+    trusted_threshold = models.IntegerField(
+        default=80, help_text="Score >= this is TRUSTED."
+    )
+    normal_threshold = models.IntegerField(
+        default=50, help_text="Score >= this is NORMAL, otherwise SUSPICIOUS."
+    )
+
+    # Peak hours
+    peak_start = models.TimeField(default=time(18, 0))
+    peak_end = models.TimeField(default=time(23, 0))
+    peak_enabled = models.BooleanField(default=True)
+
+    # Behavior toggles
+    autonomous_mode = models.BooleanField(
+        default=True,
+        help_text="If False, every access requires explicit verification.",
+    )
+    force_biometric_during_peak = models.BooleanField(default=True)
+    auto_entry_for_trusted = models.BooleanField(
+        default=True,
+        help_text="If False, even TRUSTED users must verify biometric.",
+    )
+
+    # OCR confidence floor per mode (low/medium/high)
+    ocr_min_confidence_normal = models.CharField(
+        max_length=10, default="medium"
+    )
+    ocr_min_confidence_peak = models.CharField(max_length=10, default="high")
+
+    # Risk thresholds
+    risk_low_max = models.IntegerField(
+        default=30,
+        help_text="Risk <= this means LOW risk, auto-grant possible.",
+    )
+    risk_medium_max = models.IntegerField(
+        default=70,
+        help_text="Risk <= this means MEDIUM (require biometric); above is HIGH (deny/escalate).",
+    )
+
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "Policy configuration"
+        verbose_name_plural = "Policy configuration"
+
+    def __str__(self) -> str:
+        return f"PolicyConfig (peak {self.peak_start}-{self.peak_end}, autonomous={self.autonomous_mode})"
+
+    @classmethod
+    def current(cls) -> "PolicyConfig":
+        """Get the single config row, creating it if it doesn't exist."""
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def is_peak_now(self) -> bool:
+        if not self.peak_enabled:
+            return False
+        now = timezone.localtime().time()
+        if self.peak_start <= self.peak_end:
+            return self.peak_start <= now <= self.peak_end
+        # Overnight wrap (e.g. 22:00 → 02:00)
+        return now >= self.peak_start or now <= self.peak_end
+
+
+# ====================================================================== #
+#  Parking Session
+# ====================================================================== #
 class ParkingSession(models.Model):
     class Status(models.TextChoices):
         PARKED = "PARKED", "Parked"

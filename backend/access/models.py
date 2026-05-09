@@ -84,3 +84,49 @@ class AccessLog(models.Model):
 
     def __str__(self) -> str:
         return f"[{self.event_type}/{self.status}] {self.plate_detected} @ {self.timestamp:%Y-%m-%d %H:%M}"
+
+
+# ====================================================================== #
+#  RiskEvent — fine-grained per-decision audit
+# ====================================================================== #
+class RiskEvent(models.Model):
+    """
+    Captures the inputs and computed risk score for a single access decision.
+    One per AccessLog (or per attempt that didn't even create one).
+    Enables auditing, debugging, and post-hoc anomaly investigation.
+    """
+
+    class RiskBand(models.TextChoices):
+        LOW = "LOW", "Low (auto grant)"
+        MEDIUM = "MEDIUM", "Medium (verify)"
+        HIGH = "HIGH", "High (deny/escalate)"
+
+    access_log = models.OneToOneField(
+        AccessLog,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="risk_event",
+    )
+    score = models.IntegerField(help_text="0-100 risk score; higher = riskier.")
+    band = models.CharField(max_length=10, choices=RiskBand.choices)
+    factors = models.JSONField(
+        default=dict,
+        help_text="Per-input contributions (e.g. {peak: +20, off_hours: +15}).",
+    )
+    decision_path = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Human-readable trace of how the decision was reached.",
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-timestamp",)
+        indexes = [
+            models.Index(fields=("-timestamp",)),
+            models.Index(fields=("band",)),
+        ]
+
+    def __str__(self) -> str:
+        return f"Risk[{self.band} {self.score}] @ {self.timestamp:%Y-%m-%d %H:%M}"

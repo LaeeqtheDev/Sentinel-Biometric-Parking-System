@@ -54,8 +54,10 @@ export default function AdminSessionsPage() {
       const res = await apiPost<any>('/passkeys/pickup-tokens/', {
         vehicle_id: session.vehicle,
       });
+      const origin =
+        typeof window !== 'undefined' ? window.location.origin : '';
       setQrInfo({
-        deep_link: res.deep_link,
+        deep_link: `${origin}/driver/scan/${res.token}`,
         token: res.token,
         plate: session.vehicle_detail.plate_number,
         expires_at: res.expires_at,

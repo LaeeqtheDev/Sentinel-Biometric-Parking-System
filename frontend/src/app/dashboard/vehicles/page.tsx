@@ -7,9 +7,11 @@ import { Topbar } from '@/components/Topbar';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
 import { apiGet, apiDelete } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { Vehicle, PaginatedResponse, fmtDateTime } from '@/lib/utils';
 
 export default function VehiclesPage() {
+  const { user } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,13 +32,14 @@ export default function VehiclesPage() {
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    if (user?.role === 'ADMIN') load();
+  }, [user]);
 
   useEffect(() => {
+    if (user?.role !== 'ADMIN') return;
     const t = setTimeout(() => load(search), 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, user]);
 
   async function remove(id: number) {
     if (!confirm('Delete this vehicle? This cannot be undone.')) return;

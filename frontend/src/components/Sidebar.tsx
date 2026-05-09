@@ -10,6 +10,9 @@ import {
   ScanLine,
   Video,
   ParkingCircle,
+  ClipboardCheck,
+  Settings,
+  Shield,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
@@ -22,8 +25,11 @@ const navItems = [
   { href: '/dashboard/entry', label: 'Manual Gate', icon: ScanLine },
   { href: '/dashboard/sessions', label: 'Sessions', icon: ParkingCircle },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
+  { href: '/dashboard/approvals', label: 'Approvals', icon: ClipboardCheck },
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/logs', label: 'Access Logs', icon: ScrollText },
+  { href: '/dashboard/risk-events', label: 'Risk Events', icon: Shield },
+  { href: '/dashboard/policy', label: 'Policy', icon: Settings },
 ];
 
 export function Sidebar() {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Car,
   ScanFace,
@@ -36,6 +36,7 @@ export default function EntryPage() {
   const [step, setStep] = useState<Step>('mode');
   const [mode, setMode] = useState<Mode>('ENTRY');
   const [plateImage, setPlateImage] = useState<string | null>(null);
+  const [manualPlate, setManualPlate] = useState<string>('');
   const [faceImage, setFaceImage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DecisionResult | null>(null);
@@ -44,14 +45,15 @@ export default function EntryPage() {
   function reset() {
     setStep('mode');
     setPlateImage(null);
+    setManualPlate('');
     setFaceImage(null);
     setResult(null);
     setError('');
   }
 
   async function submit() {
-    if (!plateImage) {
-      setError('Capture the license plate first.');
+    if (!plateImage && !manualPlate.trim()) {
+      setError('Capture the license plate or type it manually.');
       return;
     }
     setSubmitting(true);
@@ -59,11 +61,17 @@ export default function EntryPage() {
     try {
       const endpoint =
         mode === 'EXIT' ? '/access/verify-exit/' : '/access/verify-entry/';
-      const res = await apiPost<DecisionResult>(endpoint, {
-        plate_image_base64: plateImage,
+      const payload: any = {
         face_image_base64: faceImage || undefined,
-        via: 'manual',
-      });
+        via: manualPlate.trim() ? 'manual_plate_entry' : 'manual',
+      };
+      if (manualPlate.trim()) {
+        payload.plate_number = manualPlate.trim();
+      }
+      if (plateImage) {
+        payload.plate_image_base64 = plateImage;
+      }
+      const res = await apiPost<DecisionResult>(endpoint, payload);
       setResult(res);
       setStep('result');
     } catch (e: any) {
@@ -149,14 +157,33 @@ export default function EntryPage() {
             value={plateImage}
             onCapture={setPlateImage}
             placeholder="Position the plate inside the frame, then capture."
+            facing="environment"
+            showOverlay
+            minSharpness={30}
           />
+          <div className="mt-4 rounded-md border border-ink-700 bg-ink-900/40 p-3">
+            <label className="mb-1.5 block font-mono text-[10px] uppercase tracking-wider text-bone-500">
+              Plate text (manual override)
+            </label>
+            <input
+              type="text"
+              value={manualPlate}
+              onChange={(e) => setManualPlate(e.target.value.toUpperCase())}
+              placeholder="e.g. AAP-1478 — leave blank to use OCR"
+              className="w-full rounded border border-ink-700 bg-ink-950 px-3 py-2 font-mono text-sm tracking-wider text-bone-100 placeholder:text-bone-600 focus:border-amber focus:outline-none"
+            />
+            <p className="mt-1.5 text-[11px] text-bone-500">
+              If OCR can't read the plate (handwritten, unusual font, dirty),
+              type it here. Your text takes priority over OCR.
+            </p>
+          </div>
           <div className="mt-4 flex gap-3">
             <Button onClick={() => setStep('mode')} variant="ghost">
               ← Back
             </Button>
             <Button
               onClick={() => setStep('face')}
-              disabled={!plateImage}
+              disabled={!plateImage && !manualPlate.trim()}
               className="ml-auto"
             >
               Next <ArrowRight className="size-4" />
@@ -304,6 +331,18 @@ function ResultPanel({
   onReset: () => void;
 }) {
   const granted = result.decision === 'GRANTED';
+  // Local animation state — drive the gate phases when granted
+  const [phase, setPhase] = useState<'opening' | 'open' | 'closing' | 'closed' | null>(
+    granted ? 'opening' : null,
+  );
+  useEffect(() => {
+    if (!granted) return;
+    const t1 = setTimeout(() => setPhase('open'), 1200);
+    const t2 = setTimeout(() => setPhase('closing'), 4200);
+    const t3 = setTimeout(() => setPhase('closed'), 5400);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [granted]);
+
   return (
     <section
       className={cn(
@@ -338,6 +377,9 @@ function ResultPanel({
             {granted ? 'Access granted' : 'Access denied'}
           </h2>
           <p className="mt-2 text-sm text-bone-300">{result.reason}</p>
+
+          {/* Gate animation when granted */}
+          {granted && phase && <ManualGateAnimation phase={phase} />}
 
           <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-ink-700 pt-4 font-mono text-[11px]">
             <Row
@@ -374,6 +416,35 @@ function ResultPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function ManualGateAnimation({ phase }: { phase: 'opening' | 'open' | 'closing' | 'closed' }) {
+  const config = {
+    opening: { label: '⚙ GATE OPENING…', color: 'text-amber', pct: 50, pulse: true },
+    open: { label: '✓ GATE OPEN — vehicle passing', color: 'text-granted', pct: 100, pulse: false },
+    closing: { label: '⚙ GATE CLOSING…', color: 'text-amber', pct: 30, pulse: true },
+    closed: { label: '✓ GATE CLOSED — cycle complete', color: 'text-bone-400', pct: 0, pulse: false },
+  } as const;
+  const c = config[phase];
+  return (
+    <div className="mt-4 rounded border border-ink-700 bg-ink-900/60 px-3 py-2">
+      <div className="flex items-center justify-between">
+        <span className={cn('font-mono text-[11px] uppercase tracking-wider', c.color, c.pulse && 'animate-pulse-soft')}>
+          {c.label}
+        </span>
+        <span className="font-mono text-[10px] text-bone-500">{c.pct}%</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-800">
+        <div
+          className={cn(
+            'h-full rounded-full transition-all duration-1000',
+            phase === 'open' ? 'bg-granted' : phase === 'closed' ? 'bg-ink-700' : 'bg-amber',
+          )}
+          style={{ width: `${c.pct}%` }}
+        />
+      </div>
+    </div>
   );
 }
 

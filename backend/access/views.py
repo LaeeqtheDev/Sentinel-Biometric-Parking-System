@@ -54,21 +54,50 @@ def _read_image(request, field: str) -> bytes | None:
 
 def _resolve_plate(request) -> tuple[str, dict]:
     """
-    Returns (normalized_plate_number, ocr_meta).
-    ocr_meta has: ocr_confidence, raw_text, found_plate – only if OCR ran.
+    Returns (resolved_plate_number, ocr_meta).
+    Order of precedence:
+      1. Explicit `plate_number` field (manual override) — fuzzy-matched against DB
+      2. OCR on `plate_image` / `plate_image_base64`
+    ocr_meta has: ocr_confidence, raw_text, found_plate, sharpness, blurry.
     """
+    from vehicles.models import fuzzy_find_vehicle
+
     plate_number = (request.data.get("plate_number") or "").strip()
     plate_img_bytes = _read_image(request, "plate_image")
 
     meta: dict = {}
-    if not plate_number and plate_img_bytes:
+
+    # If admin supplied a plate manually, fuzzy-resolve it to canonical form.
+    if plate_number:
+        match = fuzzy_find_vehicle(plate_number)
+        if match:
+            return match.plate_number, {
+                "ocr_confidence": "none",
+                "manual": True,
+            }
+        # No DB match yet, but normalize the typed text so later equality
+        # comparisons still work.
+        return normalize_plate(plate_number), {
+            "ocr_confidence": "none",
+            "manual": True,
+        }
+
+    # Otherwise run OCR
+    if plate_img_bytes:
         ocr = recognize_plate(plate_img_bytes)
         plate_number = ocr["plate_number"]
         meta = {
             "ocr_confidence": ocr["confidence"],
             "raw_text": ocr["raw_text"],
             "found_plate": ocr["found_plate"],
+            "sharpness": ocr.get("sharpness"),
+            "blurry": ocr.get("blurry", False),
         }
+        # Try to fuzzy-match the OCR result against DB
+        if plate_number:
+            match = fuzzy_find_vehicle(plate_number)
+            if match:
+                plate_number = match.plate_number  # canonical form
     return normalize_plate(plate_number), meta
 
 
@@ -126,6 +155,29 @@ def verify_entry(request):
     )
     response["plate"]["registered"] = vehicle is not None
 
+    # BLOCKED vehicles are rejected outright, regardless of biometric.
+    if vehicle and vehicle.status == Vehicle.Status.BLOCKED:
+        log = _persist(
+            request,
+            AccessLog.Event.ENTRY,
+            plate_number,
+            vehicle,
+            None,
+            True,
+            False,
+            False,
+            ocr_meta.get("ocr_confidence", "none"),
+            f"Vehicle is BLOCKED: {vehicle.block_reason or 'no reason given'}",
+            AccessLog.Decision.DENIED,
+        )
+        _record_risk(log, score=95, band="HIGH",
+                     factors={"vehicle_blocked": 95},
+                     decision_path="vehicle_blocked")
+        response["decision"] = AccessLog.Decision.DENIED
+        response["reason"] = log.reason
+        response["log_id"] = log.id
+        return Response(response)
+
     # Stop duplicate-entry: if there's already a PARKED session for this vehicle, deny.
     if vehicle and ParkingSession.active_for(vehicle):
         log = _persist(
@@ -176,12 +228,67 @@ def verify_entry(request):
     plate_ok = bool(vehicle)
     bio_ok = bool(bio.get("matched"))
     auth_ok = webauthn_match or bio_ok
-    decision = AccessLog.Decision.GRANTED if (plate_ok and auth_ok) else AccessLog.Decision.DENIED
+
+    # ---- Risk engine ---------------------------------------------------- #
+    from .risk_engine import RiskInputs, compute_risk, recent_failure_count, is_off_hours_now
+    from parking.models import PolicyConfig
+
+    cfg = PolicyConfig.current()
+    risk = compute_risk(RiskInputs(
+        plate_detected=bool(plate_number),
+        plate_registered=plate_ok,
+        user=bio_target_user,
+        vehicle=vehicle,
+        ocr_confidence=ocr_meta.get("ocr_confidence", "none"),
+        is_peak=cfg.is_peak_now(),
+        is_off_hours=is_off_hours_now(),
+        has_passkey_match=webauthn_match,
+        has_face_match=bio_ok,
+        has_active_session=False,  # already checked above
+        event_type="ENTRY",
+        recent_failures=recent_failure_count(plate_number, minutes=10),
+    ))
+    response["risk"] = {
+        "score": risk.score,
+        "band": risk.band,
+        "factors": risk.factors,
+        "decision_path": risk.decision_path,
+    }
+
+    # Risk-band overrides:
+    #  HIGH risk → DENY even if other checks passed
+    #  LOW + autonomous + trusted user → GRANT without biometric
+    can_low_risk_auto_grant = (
+        risk.band == "LOW"
+        and plate_ok
+        and cfg.autonomous_mode
+        and cfg.auto_entry_for_trusted
+        and bio_target_user is not None
+        and bio_target_user.is_trusted
+    )
+
+    if risk.band == "HIGH":
+        decision = AccessLog.Decision.DENIED
+        auth_ok = False
+    elif can_low_risk_auto_grant:
+        decision = AccessLog.Decision.GRANTED
+        auth_ok = True
+        response["auto_granted_low_risk"] = True
+    else:
+        decision = (
+            AccessLog.Decision.GRANTED
+            if (plate_ok and auth_ok)
+            else AccessLog.Decision.DENIED
+        )
 
     if not plate_number:
         reason = "License plate could not be read."
     elif not plate_ok:
         reason = f"Plate '{plate_number}' is not registered."
+    elif risk.band == "HIGH":
+        reason = f"Access denied — risk score {risk.score} (HIGH). Factors: {risk.decision_path}"
+    elif response.get("auto_granted_low_risk"):
+        reason = "Trusted vehicle, low risk — auto-granted (no biometric required)."
     elif not auth_ok:
         reason = bio.get("reason") or "Driver identity could not be verified."
     else:
@@ -210,6 +317,8 @@ def verify_entry(request):
             entry_user=webauthn_user or bio_target_user,
             entry_log=log,
         )
+
+    _record_risk(log, risk.score, risk.band, risk.factors, risk.decision_path)
 
     response.update(
         {
@@ -312,6 +421,32 @@ def verify_exit(request):
             exit_log=log,
         )
 
+    # Compute and persist a risk event for the EXIT decision too
+    from .risk_engine import RiskInputs, compute_risk, recent_failure_count, is_off_hours_now
+    from parking.models import PolicyConfig
+    cfg = PolicyConfig.current()
+    risk = compute_risk(RiskInputs(
+        plate_detected=bool(plate_number),
+        plate_registered=plate_ok,
+        user=bio_target_user,
+        vehicle=vehicle,
+        ocr_confidence=ocr_meta.get("ocr_confidence", "none"),
+        is_peak=cfg.is_peak_now(),
+        is_off_hours=is_off_hours_now(),
+        has_passkey_match=webauthn_match,
+        has_face_match=bio_ok,
+        has_active_session=bool(session),
+        event_type="EXIT",
+        recent_failures=recent_failure_count(plate_number, minutes=10),
+    ))
+    _record_risk(log, risk.score, risk.band, risk.factors, risk.decision_path)
+    response["risk"] = {
+        "score": risk.score,
+        "band": risk.band,
+        "factors": risk.factors,
+        "decision_path": risk.decision_path,
+    }
+
     response.update(
         {
             "decision": decision,
@@ -332,44 +467,102 @@ def verify_exit(request):
 def live_detect(request):
     """
     The live-camera page sends a frame every couple of seconds.
-    We OCR it; if the plate looks plausible AND we haven't logged that plate
-    in the last OCR_DEBOUNCE_SECONDS seconds, we return the candidate so the
-    UI can prompt for the next step.
+    Uses FAST OCR (EasyOCR-only when available) for low latency.
+    Face detection only runs when a plate is identified, to keep things snappy.
     """
     img_bytes = _read_image(request, "plate_image")
     if not img_bytes:
         return Response({"detail": "plate_image required"}, status=400)
     try:
-        ocr = recognize_plate(img_bytes)
+        ocr = recognize_plate(img_bytes, fast=True)
     except Exception as exc:  # noqa: BLE001
         return Response({"detail": f"OCR failed: {exc}"}, status=500)
 
     plate = ocr["plate_number"]
     confidence = ocr["confidence"]
-    min_conf = (settings.OCR_MIN_CONFIDENCE or "medium").lower()
-    rank = {"high": 3, "medium": 2, "low": 1, "none": 0}
 
     response = {
         "plate": plate,
         "confidence": confidence,
         "raw_text": ocr["raw_text"],
         "found_plate": ocr["found_plate"],
+        "engine": ocr.get("engine", "tesseract"),
+        "candidates": ocr.get("candidates", []),
         "registered": False,
         "fresh": False,
         "vehicle": None,
         "active_session": None,
+        "face": {"detected": False, "matched_user": None, "distance": None},
     }
 
-    if not plate or rank.get(confidence, 0) < rank.get(min_conf, 2):
-        return Response(response)
+    # Fuzzy-match the plate against the DB even at lower confidence
+    vehicle = None
+    if plate:
+        from vehicles.models import fuzzy_find_vehicle
+        vehicle = fuzzy_find_vehicle(plate)
+        if vehicle:
+            # Update plate to the canonical form stored in DB
+            plate = vehicle.plate_number
+            response["plate"] = plate
 
-    vehicle = Vehicle.objects.filter(plate_number=plate).first()
     if not vehicle:
         return Response(response)
 
     response["registered"] = True
     from vehicles.serializers import VehicleSerializer
     response["vehicle"] = VehicleSerializer(vehicle).data
+
+    # ----- Face detection on the SAME frame (smart-gate feature) -----
+    # If a face is in the frame AND it matches a user linked to this vehicle,
+    # we have a strong "this is the legitimate driver" signal.
+    try:
+        from biometrics.models import BiometricProfile
+        from recognition.face_engine import _load_image
+        import face_recognition
+        import numpy as _np
+
+        img = _load_image(img_bytes)
+        locs = face_recognition.face_locations(img, model="hog")
+        if not locs:
+            locs = face_recognition.face_locations(img, number_of_times_to_upsample=2, model="hog")
+        if locs:
+            # Use the largest face in the frame (closest to camera)
+            locs.sort(key=lambda r: (r[2] - r[0]) * (r[1] - r[3]), reverse=True)
+            encs = face_recognition.face_encodings(img, [locs[0]])
+            if encs:
+                live_enc = encs[0]
+                response["face"]["detected"] = True
+                # Match against every user linked to the vehicle
+                tolerance = float(getattr(settings, "FACE_MATCH_TOLERANCE", 0.6))
+                best_match = None
+                best_dist = 999.0
+                for uv in vehicle.uservehicle_set.select_related("user").all():
+                    user = uv.user
+                    profile = BiometricProfile.objects.filter(user=user).first()
+                    if not profile or not profile.encoding:
+                        continue
+                    stored = _np.frombuffer(profile.encoding, dtype=_np.float64)
+                    if stored.size == 0:
+                        continue
+                    dist = float(_np.linalg.norm(stored - live_enc))
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_match = user
+                if best_match and best_dist <= tolerance:
+                    from accounts.serializers import UserSerializer
+                    response["face"]["matched_user"] = {
+                        "id": best_match.id,
+                        "username": best_match.username,
+                        "first_name": best_match.first_name,
+                        "last_name": best_match.last_name,
+                        "trust_level": best_match.trust_level,
+                    }
+                    response["face"]["distance"] = round(best_dist, 4)
+                else:
+                    response["face"]["distance"] = round(best_dist, 4) if best_match else None
+    except Exception as exc:  # noqa: BLE001
+        # Face detection is best-effort; never break the OCR flow
+        response["face"]["error"] = str(exc)[:120]
 
     # Debounce – don't trigger again if we logged this plate recently.
     cutoff = timezone.now() - timedelta(seconds=settings.OCR_DEBOUNCE_SECONDS)
@@ -390,13 +583,9 @@ def live_detect(request):
     response["suggested_event"] = "EXIT" if session else "ENTRY"
 
     # ----- Risk-based decision (autonomous mode) -----
-    # Find the "primary" user linked to the vehicle (first OWNER, else first user).
     primary = vehicle.primary_user
     trust = primary.trust_level if primary else "NORMAL"
     response["trust_level"] = trust
-    # Auto-grant rule: if autonomous mode is on, the plate is registered, the
-    # primary user is TRUSTED, and there's no risky pattern, the gate can open
-    # without biometric.
     autonomous = bool(getattr(settings, "AUTONOMOUS_MODE", True))
     is_suspicious_time = _is_off_hours(timezone.localtime().hour)
     risk_factors = []
@@ -620,3 +809,63 @@ def _persist(
         )
     log.save()
     return log
+
+
+def _record_risk(
+    access_log: AccessLog,
+    score: int,
+    band: str,
+    factors: dict,
+    decision_path: str = "",
+) -> None:
+    """Persist a RiskEvent linked to the AccessLog (best-effort)."""
+    from .models import RiskEvent
+    try:
+        RiskEvent.objects.create(
+            access_log=access_log,
+            score=score,
+            band=band,
+            factors=factors,
+            decision_path=decision_path,
+        )
+    except Exception:
+        pass
+
+
+# ====================================================================== #
+#  Risk events feed
+# ====================================================================== #
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def risk_events(request):
+    """Recent RiskEvent rows with their AccessLog summary."""
+    from .models import RiskEvent
+    band = request.query_params.get("band")
+    qs = RiskEvent.objects.select_related("access_log__vehicle", "access_log__user").all()
+    if band:
+        qs = qs.filter(band=band.upper())
+    qs = qs[:50]
+    out = []
+    for r in qs:
+        a = r.access_log
+        out.append({
+            "id": r.id,
+            "score": r.score,
+            "band": r.band,
+            "factors": r.factors,
+            "decision_path": r.decision_path,
+            "timestamp": r.timestamp.isoformat(),
+            "access_log": (
+                {
+                    "id": a.id,
+                    "event_type": a.event_type,
+                    "plate_detected": a.plate_detected,
+                    "status": a.status,
+                    "username": a.user.username if a.user else None,
+                    "via": a.via,
+                }
+                if a
+                else None
+            ),
+        })
+    return Response(out)

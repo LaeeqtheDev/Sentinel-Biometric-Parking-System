@@ -61,7 +61,33 @@ export default function ScanTokenPage() {
         setPhase('denied');
       }
     } catch (e: any) {
-      setError(e?.message || 'Verification cancelled.');
+      const raw = e?.message || String(e || 'Verification cancelled.');
+      // Translate common WebAuthn / network errors into actionable hints
+      let friendly = raw;
+      if (
+        raw.includes('NotAllowedError') ||
+        raw.includes('not allowed') ||
+        raw.includes('cancelled') ||
+        raw.includes('canceled')
+      ) {
+        friendly =
+          "You cancelled the prompt or the device timed out. Try again — when your phone shows FaceID/fingerprint, tap to confirm.";
+      } else if (
+        raw.includes('SecurityError') ||
+        raw.includes('relying party') ||
+        raw.includes('rpId') ||
+        raw.includes('origin')
+      ) {
+        friendly =
+          "Your phone can't access the parking system server. Make sure you're on the same Wi-Fi as the kiosk and that the URL the QR opened is reachable. If the URL says 'localhost', that's the bug — ask admin to use their LAN IP.";
+      } else if (raw.includes('No matching passkey') || raw.includes('no passkeys')) {
+        friendly =
+          "No passkey enrolled for this username on this device. Open /driver/biometric on this phone and enroll one first.";
+      } else if (raw.includes('Network')) {
+        friendly =
+          "Couldn't reach the server. Check your Wi-Fi and try again.";
+      }
+      setError(friendly);
       setPhase('denied');
     }
   }

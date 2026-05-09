@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, policy_views
 
 urlpatterns = [
     path("sessions/", views.ParkingSessionList.as_view(), name="parking_sessions"),
@@ -11,4 +11,5 @@ urlpatterns = [
         views.active_for_plate,
         name="parking_active_for_plate",
     ),
+    path("policy/", policy_views.policy_config, name="policy_config"),
 ]

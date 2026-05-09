@@ -19,8 +19,14 @@ export interface User {
   phone: string;
   cnic: string;
   role: 'ADMIN' | 'DRIVER';
+  trust_level?: 'TRUSTED' | 'NORMAL' | 'SUSPICIOUS';
+  trust_score?: number;
   is_active: boolean;
   has_biometric: boolean;
+  driving_license_doc?: string | null;
+  cnic_doc?: string | null;
+  documents_verified?: boolean;
+  last_activity_at?: string | null;
   created_at: string;
 }
 

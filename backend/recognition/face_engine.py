@@ -74,27 +74,52 @@ def verify_face(file_bytes: bytes, stored_encoding_bytes: bytes) -> dict:
     Returns
     -------
     {
-        "matched":  bool,
-        "distance": float,         # 0 = identical, ~0.6 = match cutoff
-        "found_face": bool
+        "matched":   bool,
+        "distance":  float,        # 0 = identical, lower = better match
+        "found_face": bool,
+        "tolerance": float,        # the cutoff used
+        "reason":    str | None,
     }
     """
     image = _load_image(file_bytes)
+    # Try HOG first (fast), fall back to CNN-style locations sweep on small images.
     locations = face_recognition.face_locations(image, model="hog")
     if not locations:
-        return {"matched": False, "distance": 1.0, "found_face": False}
+        # Try a more exhaustive scan for small / partial faces
+        locations = face_recognition.face_locations(
+            image, number_of_times_to_upsample=2, model="hog"
+        )
+    if not locations:
+        return {
+            "matched": False,
+            "distance": 1.0,
+            "found_face": False,
+            "tolerance": float(getattr(settings, "FACE_MATCH_TOLERANCE", 0.6)),
+            "reason": "No face detected in the captured image. Make sure your face is well lit, centered, and not too small.",
+        }
 
     locations.sort(key=lambda r: (r[2] - r[0]) * (r[1] - r[3]), reverse=True)
     encodings = face_recognition.face_encodings(image, [locations[0]])
     if not encodings:
-        return {"matched": False, "distance": 1.0, "found_face": False}
+        return {
+            "matched": False,
+            "distance": 1.0,
+            "found_face": False,
+            "tolerance": float(getattr(settings, "FACE_MATCH_TOLERANCE", 0.6)),
+            "reason": "Detected a face but couldn't compute its features. Try better lighting.",
+        }
 
     stored = bytes_to_encoding(stored_encoding_bytes)
     distance = float(np.linalg.norm(stored - encodings[0]))
     tolerance = float(getattr(settings, "FACE_MATCH_TOLERANCE", 0.6))
+    matched = distance <= tolerance
 
     return {
-        "matched": distance <= tolerance,
+        "matched": matched,
         "distance": round(distance, 4),
         "found_face": True,
+        "tolerance": tolerance,
+        "reason": None
+        if matched
+        else f"Face does not match the enrolled identity (distance {distance:.3f} > tolerance {tolerance:.2f}). Try better lighting or re-enroll.",
     }

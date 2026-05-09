@@ -62,14 +62,18 @@ interface ApiOptions extends Omit<RequestInit, 'body'> {
   body?: any;
   isFormData?: boolean;
   skipAuth?: boolean;
+  /** Number of times to retry on 5xx / network errors. Default 2. */
+  retries?: number;
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function api<T = any>(
   path: string,
   opts: ApiOptions = {},
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
-  const { body, isFormData, skipAuth, headers, ...rest } = opts;
+  const { body, isFormData, skipAuth, headers, retries = 2, ...rest } = opts;
 
   const buildHeaders = (token: string | null): HeadersInit => {
     const h: Record<string, string> = { ...((headers as any) || {}) };
@@ -94,7 +98,35 @@ export async function api<T = any>(
     });
 
   let token = tokenStore.getAccess();
-  let response = await doFetch(token);
+  let response: Response;
+  let attempt = 0;
+  // Network or 5xx errors get retried with exponential backoff.
+  while (true) {
+    try {
+      response = await doFetch(token);
+    } catch (networkErr) {
+      if (attempt < retries) {
+        await sleep(300 * Math.pow(2, attempt));
+        attempt++;
+        continue;
+      }
+      throw new ApiError(
+        'Network error: could not reach the server.',
+        0,
+        null,
+      );
+    }
+    // Retry on 502/503/504 (server transient failures) and 500 (sometimes)
+    if (
+      [500, 502, 503, 504].includes(response.status) &&
+      attempt < retries
+    ) {
+      await sleep(300 * Math.pow(2, attempt));
+      attempt++;
+      continue;
+    }
+    break;
+  }
 
   // Auto-refresh once on 401
   if (response.status === 401 && !skipAuth) {

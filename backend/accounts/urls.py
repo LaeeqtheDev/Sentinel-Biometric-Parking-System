@@ -12,6 +12,7 @@ urlpatterns = [
     path("register/", views.register, name="register"),
     path("refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("me/", views.me, name="me"),
+    path("me/documents/", views.upload_my_documents, name="upload_my_documents"),
     path("change-password/", views.change_password, name="change_password"),
     path("", include(router.urls)),
 ]

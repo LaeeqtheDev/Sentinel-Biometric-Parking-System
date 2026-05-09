@@ -46,6 +46,8 @@ export interface Vehicle {
   model: string;
   color: string;
   is_active: boolean;
+  status: 'ACTIVE' | 'BLOCKED' | 'UNDER_REVIEW';
+  block_reason?: string;
   assignments?: UserVehicleAssignment[];
   owners_detail?: any[];
   drivers_detail?: any[];

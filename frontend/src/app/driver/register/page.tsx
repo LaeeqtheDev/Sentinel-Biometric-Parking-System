@@ -23,7 +23,14 @@ export default function DriverRegisterPage() {
     cnic: '',
     password: '',
     confirm: '',
+    // Optional vehicle onboarding (in same flow)
+    vehicle_plate: '',
+    vehicle_make: '',
+    vehicle_model: '',
+    vehicle_color: '',
+    vehicle_type: 'CAR',
   });
+  const [includeVehicle, setIncludeVehicle] = useState(false);
 
   useEffect(() => {
     if (!loading && user) router.replace('/driver');
@@ -60,6 +67,15 @@ export default function DriverRegisterPage() {
           phone: form.phone.trim(),
           cnic: form.cnic.trim(),
           password: form.password,
+          ...(includeVehicle && form.vehicle_plate.trim()
+            ? {
+                vehicle_plate: form.vehicle_plate.trim(),
+                vehicle_make: form.vehicle_make.trim(),
+                vehicle_model: form.vehicle_model.trim(),
+                vehicle_color: form.vehicle_color.trim(),
+                vehicle_type: form.vehicle_type,
+              }
+            : {}),
         },
         { skipAuth: true },
       );
@@ -178,6 +194,50 @@ export default function DriverRegisterPage() {
             required
             autoComplete="new-password"
           />
+
+          {/* Optional vehicle onboarding */}
+          <div className="rounded-lg border border-ink-700 bg-ink-800/40 p-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-bone-200">
+              <input
+                type="checkbox"
+                checked={includeVehicle}
+                onChange={(e) => setIncludeVehicle(e.target.checked)}
+                className="size-4 rounded border-ink-600 bg-ink-900 text-amber focus:ring-amber"
+              />
+              I want to add my vehicle now (optional)
+            </label>
+            {includeVehicle && (
+              <div className="mt-3 space-y-2.5 border-t border-ink-700 pt-3">
+                <Input
+                  label="Plate number"
+                  value={form.vehicle_plate}
+                  onChange={(e) =>
+                    update('vehicle_plate', e.target.value.toUpperCase())
+                  }
+                  placeholder="AAP-1478"
+                  className="font-mono tracking-widest"
+                />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <Input
+                    label="Make"
+                    value={form.vehicle_make}
+                    onChange={(e) => update('vehicle_make', e.target.value)}
+                    placeholder="Toyota"
+                  />
+                  <Input
+                    label="Model"
+                    value={form.vehicle_model}
+                    onChange={(e) => update('vehicle_model', e.target.value)}
+                    placeholder="Corolla"
+                  />
+                </div>
+                <p className="text-[11px] text-bone-500">
+                  Your vehicle starts as <strong>under review</strong>. An
+                  admin will approve it before the gate trusts it.
+                </p>
+              </div>
+            )}
+          </div>
 
           {error && (
             <div className="rounded-md border border-denied/30 bg-denied/10 px-3 py-2 text-sm text-denied">

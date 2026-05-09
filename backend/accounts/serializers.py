@@ -22,11 +22,24 @@ class UserSerializer(serializers.ModelSerializer):
             "cnic",
             "role",
             "trust_level",
+            "trust_score",
+            "last_activity_at",
             "is_active",
             "has_biometric",
+            "driving_license_doc",
+            "cnic_doc",
+            "documents_verified",
             "created_at",
         )
-        read_only_fields = ("id", "created_at", "has_biometric")
+        read_only_fields = (
+            "id",
+            "created_at",
+            "has_biometric",
+            "trust_score",
+            "trust_level",
+            "last_activity_at",
+            "documents_verified",
+        )
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
