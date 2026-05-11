@@ -107,7 +107,7 @@ export default function ApprovalsPage() {
           <ul className="grid gap-4 lg:grid-cols-2">
             {pending.map((v) => {
               const driverDoc = v.assignments?.[0]?.user_detail;
-              const regDoc = fileURL(v.registration_doc as any);
+              const regDoc = fileURL(v.registration_doc);
               const licDoc = fileURL(driverDoc?.driving_license_doc);
               const cnicDoc = fileURL(driverDoc?.cnic_doc);
               return (

@@ -48,13 +48,13 @@ export interface Vehicle {
   is_active: boolean;
   status: 'ACTIVE' | 'BLOCKED' | 'UNDER_REVIEW';
   block_reason?: string;
+  registration_doc?: string | null;
   assignments?: UserVehicleAssignment[];
   owners_detail?: any[];
   drivers_detail?: any[];
   created_at: string;
   updated_at: string;
 }
-
 export interface AccessLog {
   id: number;
   event_type: 'ENTRY' | 'EXIT';
