@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Car,
   ParkingCircle,
@@ -17,6 +17,41 @@ import { apiGet, apiPost } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { authenticatePasskey, webauthnSupported } from '@/lib/webauthn';
 import { ParkingSession, fmtDateTime, fmtDuration, cn } from '@/lib/utils';
+
+type GateState = 'closed' | 'opening' | 'open' | 'closing';
+
+function GateAnimation({ state }: { state: GateState }) {
+  const labels: Record<GateState, string> = {
+    closed: 'GATE CLOSED',
+    opening: 'OPENING…',
+    open: 'GATE OPEN',
+    closing: 'CLOSING…',
+  };
+  const colors: Record<GateState, string> = {
+    closed: 'border-ink-600 bg-ink-800',
+    opening: 'border-amber/60 bg-amber/10',
+    open: 'border-granted/60 bg-granted/10',
+    closing: 'border-amber/40 bg-amber/5',
+  };
+  const barH: Record<GateState, string> = {
+    closed: 'h-16',
+    opening: 'h-6',
+    open: 'h-0',
+    closing: 'h-10',
+  };
+  return (
+    <div className={cn('rounded-lg border-2 p-6 text-center transition-all duration-700', colors[state])}>
+      <div className="flex items-end justify-center gap-1 mb-3">
+        <div className={cn('w-3 rounded-t bg-amber/60 transition-all duration-700', barH[state])} />
+        <div className={cn('w-3 rounded-t bg-amber/60 transition-all duration-700 delay-75', barH[state])} />
+        <div className={cn('w-3 rounded-t bg-amber/60 transition-all duration-700 delay-150', barH[state])} />
+      </div>
+      <p className={cn('font-mono text-sm font-bold tracking-widest', state === 'open' ? 'text-granted' : state === 'closed' ? 'text-bone-500' : 'text-amber')}>
+        {labels[state]}
+      </p>
+    </div>
+  );
+}
 
 type Phase =
   | 'select'
@@ -39,8 +74,16 @@ export default function DriverPickupPage() {
     useState<ParkingSession | null>(null);
   const [result, setResult] = useState<any>(null);
   const [faceImage, setFaceImage] = useState<string | null>(null);
+  const [gateState, setGateState] = useState<GateState>('closed');
   const passkeyAvailable = webauthnSupported();
   const faceAvailable = Boolean(user?.has_biometric);
+
+  function runGateAnimation() {
+    setGateState('opening');
+    setTimeout(() => setGateState('open'), 800);
+    setTimeout(() => setGateState('closing'), 3000);
+    setTimeout(() => setGateState('closed'), 4500);
+  }
 
   async function load() {
     setLoading(true);
@@ -91,7 +134,7 @@ export default function DriverPickupPage() {
 
       setResult(res);
       setPhase(res.decision === 'GRANTED' ? 'success' : 'denied');
-      if (res.decision === 'GRANTED') load();
+      if (res.decision === 'GRANTED') { runGateAnimation(); load(); }
     } catch (e: any) {
       // Passkey failed — offer face fallback if available
       if (faceAvailable) {
@@ -117,7 +160,7 @@ export default function DriverPickupPage() {
       });
       setResult(res);
       setPhase(res.decision === 'GRANTED' ? 'success' : 'denied');
-      if (res.decision === 'GRANTED') load();
+      if (res.decision === 'GRANTED') { runGateAnimation(); load(); }
     } catch (e: any) {
       setError(e.message || 'Face verification failed.');
       setPhase('denied');
@@ -310,14 +353,17 @@ export default function DriverPickupPage() {
       )}
 
       {phase === 'success' && result && (
-        <ResultPanel
-          icon={CheckCircle2}
-          color="granted"
-          title="Access granted"
-          subtitle={result.reason}
-          session={selectedSession}
-          onReset={reset}
-        />
+        <div className="space-y-4">
+          <GateAnimation state={gateState} />
+          <ResultPanel
+            icon={CheckCircle2}
+            color="granted"
+            title="Access granted"
+            subtitle={result.reason}
+            session={selectedSession}
+            onReset={reset}
+          />
+        </div>
       )}
 
       {phase === 'denied' && (
