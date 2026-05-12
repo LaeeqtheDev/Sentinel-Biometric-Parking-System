@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Settings,
   Shield,
+  AlertTriangle,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/dashboard/users', label: 'Users', icon: Users },
   { href: '/dashboard/logs', label: 'Access Logs', icon: ScrollText },
   { href: '/dashboard/risk-events', label: 'Risk Events', icon: Shield },
+  { href: '/dashboard/incidents', label: 'Incidents', icon: AlertTriangle },
   { href: '/dashboard/policy', label: 'Policy', icon: Settings },
 ];
 

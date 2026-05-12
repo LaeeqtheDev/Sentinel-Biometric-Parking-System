@@ -5,6 +5,7 @@ Django settings for the Biometric Parking System.
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -72,14 +74,29 @@ TEMPLATES = [
 WSGI_APPLICATION = "core.wsgi.application"
 
 # ------------------------------------------------------------------ #
-#  Database
+#  Database — Postgres on Render, SQLite locally
 # ------------------------------------------------------------------ #
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DATABASE_URL = config("DATABASE_URL", default="")
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {"default": dj_database_url.config(default=DATABASE_URL, conn_max_age=600)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
+
+# ------------------------------------------------------------------ #
+#  Static & Media
+# ------------------------------------------------------------------ #
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = config("MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
 # ------------------------------------------------------------------ #
 #  Auth
@@ -104,12 +121,6 @@ USE_TZ = True
 # ------------------------------------------------------------------ #
 #  Static / Media
 # ------------------------------------------------------------------ #
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ------------------------------------------------------------------ #

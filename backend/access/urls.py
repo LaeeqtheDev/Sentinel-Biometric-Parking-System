@@ -10,4 +10,5 @@ urlpatterns = [
     path("live-detect/", views.live_detect, name="live_detect"),
     path("manual-override/", views.manual_override, name="manual_override"),
     path("risk-events/", views.risk_events, name="risk_events"),
+    path("incidents/", views.incidents, name="incidents"),
 ]

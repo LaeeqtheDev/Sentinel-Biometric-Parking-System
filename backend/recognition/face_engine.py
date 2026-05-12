@@ -22,7 +22,12 @@ import numpy as np
 from django.conf import settings
 
 # face_recognition pulls in dlib; both must be installed.  See README.
-import face_recognition           # type: ignore
+try:
+    import face_recognition           # type: ignore
+    FACE_RECOGNITION_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    face_recognition = None  # type: ignore
+    FACE_RECOGNITION_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------- #
@@ -68,6 +73,14 @@ def encode_face(file_bytes: bytes) -> Optional[bytes]:
 
 
 def verify_face(file_bytes: bytes, stored_encoding_bytes: bytes) -> dict:
+    if not FACE_RECOGNITION_AVAILABLE:
+        return {
+            "matched": False,
+            "distance": 1.0,
+            "found_face": False,
+            "tolerance": float(getattr(settings, "FACE_MATCH_TOLERANCE", 0.6)),
+            "reason": "Face recognition unavailable on this deployment. Use passkey instead.",
+        }
     """
     Compare a freshly-captured face against a stored encoding.
 

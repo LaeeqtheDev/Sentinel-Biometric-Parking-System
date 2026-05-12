@@ -130,3 +130,36 @@ class RiskEvent(models.Model):
 
     def __str__(self) -> str:
         return f"Risk[{self.band} {self.score}] @ {self.timestamp:%Y-%m-%d %H:%M}"
+
+
+# ====================================================================== #
+#  Incident — security events requiring admin attention
+# ====================================================================== #
+class Incident(models.Model):
+    class Severity(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+        CRITICAL = "CRITICAL", "Critical"
+
+    severity = models.CharField(max_length=10, choices=Severity.choices, default=Severity.MEDIUM)
+    reason = models.CharField(max_length=500)
+    access_log = models.ForeignKey(
+        AccessLog, on_delete=models.SET_NULL, null=True, blank=True, related_name="incidents"
+    )
+    vehicle = models.ForeignKey(
+        "vehicles.Vehicle", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    resolved = models.BooleanField(default=False)
+    resolved_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    resolution_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"[{self.severity}] {self.reason[:60]}"

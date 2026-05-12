@@ -55,6 +55,7 @@ export interface Vehicle {
   created_at: string;
   updated_at: string;
 }
+
 export interface AccessLog {
   id: number;
   event_type: 'ENTRY' | 'EXIT';

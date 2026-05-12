@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
-const PUBLIC_ROUTES = ['/driver/login', '/driver/scan', '/driver/register'];
+const PUBLIC_ROUTES = ['/driver/login', '/driver/scan']; // /driver/scan/[token] too
 
 export default function DriverLayout({
   children,

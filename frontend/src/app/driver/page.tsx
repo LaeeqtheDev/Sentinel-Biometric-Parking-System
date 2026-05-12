@@ -85,7 +85,7 @@ export default function DriverHomePage() {
                 </p>
                 <p className="text-xs text-bone-400">
                   Since {fmtDateTime(s.entry_time)} ·{' '}
-                  {fmtDuration(s.duration_seconds)}
+                  {fmtDuration(s.entry_time, new Date().toISOString())}
                 </p>
               </div>
               <Link

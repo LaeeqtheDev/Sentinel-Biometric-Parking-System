@@ -1,0 +1,34 @@
+# Django Core
+Django==5.0.6
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+python-decouple==3.8
+
+# Production server
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Database (Postgres on Render)
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# Image / OCR
+Pillow==10.3.0
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+pytesseract==0.3.10
+
+# WebAuthn / Passkeys
+webauthn==2.5.2
+
+# QR codes
+qrcode==7.4.2
+
+# Utilities
+python-dateutil==2.9.0.post0
+
+# Face recognition (will gracefully degrade if dlib build fails)
+# Render will try to build dlib from source — if it fails, face match
+# is disabled but everything else works fine.
+face-recognition==1.3.0

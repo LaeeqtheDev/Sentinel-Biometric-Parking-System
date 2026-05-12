@@ -869,3 +869,47 @@ def risk_events(request):
             ),
         })
     return Response(out)
+
+
+@api_view(["GET", "PATCH"])
+@permission_classes([IsAdminRole])
+def incidents(request):
+    """List incidents or resolve one (PATCH with ?id=X)."""
+    from .models import Incident
+    if request.method == "PATCH":
+        inc_id = request.query_params.get("id")
+        try:
+            inc = Incident.objects.get(pk=inc_id)
+        except Incident.DoesNotExist:
+            return Response({"detail": "Not found"}, status=404)
+        inc.resolved = True
+        inc.resolved_by = request.user
+        inc.resolution_notes = request.data.get("notes", "")
+        inc.save()
+        return Response({"status": "resolved"})
+
+    severity = request.query_params.get("severity")
+    resolved = request.query_params.get("resolved", "false").lower() == "true"
+    qs = Incident.objects.select_related("access_log", "vehicle", "resolved_by").filter(
+        resolved=resolved
+    )
+    if severity:
+        qs = qs.filter(severity=severity.upper())
+    qs = qs[:50]
+    out = []
+    for i in qs:
+        out.append({
+            "id": i.id,
+            "severity": i.severity,
+            "reason": i.reason,
+            "resolved": i.resolved,
+            "resolved_by": i.resolved_by.username if i.resolved_by else None,
+            "resolution_notes": i.resolution_notes,
+            "created_at": i.created_at.isoformat(),
+            "vehicle": {
+                "id": i.vehicle.id,
+                "plate_number": i.vehicle.plate_number,
+            } if i.vehicle else None,
+            "access_log_id": i.access_log_id,
+        })
+    return Response(out)

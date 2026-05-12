@@ -116,28 +116,36 @@ export default function LiveCameraPage() {
     })();
   }, []);
 
-  // Autonomous EXIT auto-actions — fires when a new EXIT detection arrives
-  // that satisfies all conditions for self-service.
+  // Autonomous EXIT auto-actions — passkey is PRIMARY trust anchor.
+  // Face match is a BONUS signal only.
+  // Flow:
+  //   TRUSTED user + face matched  → auto-grant (elite tier, both signals confirm)
+  //   All other cases              → show QR (driver verifies via passkey on phone)
+  // This ensures passkey (hardware-level security) is always in the loop.
   useEffect(() => {
     if (!autonomousExit) return;
     const latest = detections[0];
     if (!latest) return;
     if (latest.gate !== 'EXIT') return;
-    if (!latest.fresh) return;                  // already acted recently
-    if (!latest.registered) return;             // unknown plate — admin must intervene
-    if (!latest.active_session) return;         // can't exit if not parked
-    if (latest.decisionLog) return;             // already has a decision
+    if (!latest.fresh) return;
+    if (!latest.registered) return;
+    if (!latest.active_session) return;
+    if (latest.decisionLog) return;
     if (autoActedRef.current.has(latest.id)) return;
     autoActedRef.current.add(latest.id);
 
-    if (latest.face?.matched_user) {
-      // Plate + face match → auto-grant immediately (no admin click)
+    const isTrusted = latest.face?.matched_user?.trust_level === 'TRUSTED';
+    const faceMatched = !!latest.face?.matched_user;
+
+    if (isTrusted && faceMatched) {
+      // Elite path: TRUSTED user AND face confirmed → auto-grant
+      // Both passkey history (trust level earned via passkeys) + face agree
       actOnDetection(latest);
     } else {
-      // Face missing or no match → display QR for the driver to verify on the spot
+      // Standard path: show QR → driver uses passkey on their phone
+      // This is the PRIMARY verification mechanism
       autoSendQR(latest);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detections, autonomousExit]);
 
   function startEdit(det: Detection) {
@@ -313,10 +321,11 @@ export default function LiveCameraPage() {
                 </label>
               </div>
               <p className="mt-1 text-xs text-bone-400">
-                When ON, the EXIT camera self-decides:{' '}
-                <span className="text-bone-200">plate + face match → gate opens automatically</span>.{' '}
-                If face is missing or doesn't match, a{' '}
-                <span className="text-bone-200">QR code appears on screen</span> for the driver to verify on the spot with their phone. ENTRY camera always stays manual (admin reviews unknown plates).
+                Verification hierarchy:{' '}
+                <span className="text-bone-200">Passkey is primary</span> — face is a bonus signal only.
+                EXIT detects plate → shows QR immediately → driver verifies via passkey on phone.
+                Exception: TRUSTED users with face confirmed skip QR.
+                ENTRY camera stays manual — admin reviews unknown plates.
               </p>
             </div>
           </div>
