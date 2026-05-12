@@ -237,6 +237,11 @@ def upload_vehicle_doc(request, vehicle_id: int):
     vehicle.registration_doc = request.FILES["registration_doc"]
     vehicle.save(update_fields=["registration_doc"])
     return Response(VehicleSerializer(vehicle).data)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def remove_my_vehicle(request, vehicle_id: int):
     """Driver removes themselves from a vehicle they're linked to."""
     link = UserVehicle.objects.filter(
         user=request.user, vehicle_id=vehicle_id
