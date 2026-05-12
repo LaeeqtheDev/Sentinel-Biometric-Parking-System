@@ -221,9 +221,22 @@ def add_my_vehicle(request):
     )
 
 
-@api_view(["DELETE"])
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def remove_my_vehicle(request, vehicle_id: int):
+@parser_classes([MultiPartParser, JSONParser])
+def upload_vehicle_doc(request, vehicle_id: int):
+    """Driver uploads registration doc for one of their own vehicles."""
+    link = UserVehicle.objects.filter(
+        user=request.user, vehicle_id=vehicle_id
+    ).first()
+    if not link:
+        return Response({"detail": "Vehicle not found in your account."}, status=404)
+    if "registration_doc" not in request.FILES:
+        return Response({"detail": "registration_doc file required."}, status=400)
+    vehicle = link.vehicle
+    vehicle.registration_doc = request.FILES["registration_doc"]
+    vehicle.save(update_fields=["registration_doc"])
+    return Response(VehicleSerializer(vehicle).data)
     """Driver removes themselves from a vehicle they're linked to."""
     link = UserVehicle.objects.filter(
         user=request.user, vehicle_id=vehicle_id

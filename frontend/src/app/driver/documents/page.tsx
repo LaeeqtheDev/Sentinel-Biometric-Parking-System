@@ -79,8 +79,8 @@ export default function DriverDocumentsPage() {
       fd.append('registration_doc', vehicleDocFile);
       const token = tokenStore.getAccess();
       // PATCH the vehicle with the new doc
-      const res = await fetch(`${API_URL}/vehicles/${selectedVehicleId}/`, {
-        method: 'PATCH',
+      const res = await fetch(`${API_URL}/vehicles/my/${selectedVehicleId}/doc/`, {
+        method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: fd,
       });
