@@ -47,14 +47,20 @@ def _extract_image(request) -> tuple[bytes | None, str]:
 #  Enrollment
 # ---------------------------------------------------------------------- #
 @api_view(["POST"])
-@permission_classes([IsAdminRole])
+@permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, JSONParser])
 def enroll(request):
+    # Admins can enroll any user by passing user_id.
+    # Drivers can only enroll themselves.
     user_id = request.data.get("user_id") or request.data.get("user")
-    if not user_id:
-        return Response({"detail": "user_id is required."}, status=400)
 
-    user = get_object_or_404(User, pk=user_id)
+    if request.user.role == "ADMIN":
+        if not user_id:
+            return Response({"detail": "user_id is required."}, status=400)
+        user = get_object_or_404(User, pk=user_id)
+    else:
+        # Driver self-enroll — ignore any user_id, always use own account
+        user = request.user
     img_bytes, filename = _extract_image(request)
     if not img_bytes:
         return Response(

@@ -747,6 +747,17 @@ def stats(request):
         .order_by("day")
     )
 
+    # Always return all 7 days even when there's no data
+    existing = {r["day"]: r for r in last_7}
+    full_7_days = []
+    for i in range(6, -1, -1):
+        day = today - timezone.timedelta(days=i)
+        day_str = str(day)
+        if day_str in existing:
+            full_7_days.append(existing[day_str])
+        else:
+            full_7_days.append({"day": day_str, "granted": 0, "denied": 0})
+
     return Response(
         {
             "totals": {
@@ -765,7 +776,7 @@ def stats(request):
             "active_sessions": ParkingSession.objects.filter(
                 status=ParkingSession.Status.PARKED
             ).count(),
-            "last_7_days": list(last_7),
+            "last_7_days": full_7_days,
             "recent_logs": AccessLogSerializer(qs[:5], many=True).data,
         }
     )

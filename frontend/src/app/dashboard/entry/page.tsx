@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Car,
   ScanFace,
@@ -11,13 +11,21 @@ import {
   RefreshCw,
   ArrowDownLeft,
   ArrowUpRight,
+  QrCode,
+  Smartphone,
 } from 'lucide-react';
 import { WebcamCapture } from '@/components/WebcamCapture';
 import { Button } from '@/components/Button';
-import { apiPost } from '@/lib/api';
+import { apiPost, apiGet } from '@/lib/api';
 import { cn, fmtDateTime } from '@/lib/utils';
+import dynamic from 'next/dynamic';
 
-type Step = 'mode' | 'plate' | 'face' | 'result';
+const QRCodeSVG = dynamic(
+  () => import('qrcode.react').then((m) => m.QRCodeSVG),
+  { ssr: false, loading: () => <div className="size-[200px] bg-ink-800" /> },
+);
+
+type Step = 'mode' | 'plate' | 'qr' | 'face' | 'result';
 type Mode = 'ENTRY' | 'EXIT';
 
 interface DecisionResult {
@@ -41,6 +49,73 @@ export default function EntryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DecisionResult | null>(null);
   const [error, setError] = useState('');
+  const [qrLink, setQrLink] = useState<string>('');
+  const [qrToken, setQrToken] = useState<string>('');
+  const [qrGenerating, setQrGenerating] = useState(false);
+  const qrPollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Poll QR token until authorized or expired
+  useEffect(() => {
+    if (step !== 'qr' || !qrToken) return;
+    let stopped = false;
+    qrPollRef.current = setInterval(async () => {
+      if (stopped) return;
+      try {
+        const res = await apiGet<any>(`/passkeys/pickup-tokens/${qrToken}/`);
+        if (res.status === 'AUTHORIZED') {
+          stopped = true;
+          clearInterval(qrPollRef.current!);
+          // Token authorized — finalize access
+          setResult({
+            decision: 'GRANTED',
+            event_type: mode,
+            reason: 'Driver verified via QR passkey.',
+            log_id: res.access_log_id || 0,
+            timestamp: new Date().toISOString(),
+          });
+          setStep('result');
+        } else if (res.status === 'EXPIRED' || res.status === 'CONSUMED') {
+          stopped = true;
+          clearInterval(qrPollRef.current!);
+        }
+      } catch {/* keep polling */}
+    }, 2000);
+    return () => { stopped = true; clearInterval(qrPollRef.current!); };
+  }, [step, qrToken, mode]);
+
+  async function generateQR() {
+    const plate = manualPlate.trim() || '';
+    if (!plate && !plateImage) {
+      setError('Capture or type the plate first.');
+      return;
+    }
+    setQrGenerating(true);
+    setError('');
+    try {
+      // Look up the vehicle first
+      let vehicleId: number | null = null;
+      if (plate) {
+        const v = await apiGet<any>(`/vehicles/lookup/${encodeURIComponent(plate)}/`).catch(() => null);
+        if (v && v.id) vehicleId = v.id;
+      }
+      if (!vehicleId) {
+        setError('Plate not registered — cannot generate QR. Use face verification instead.');
+        return;
+      }
+      const res = await apiPost<any>('/passkeys/pickup-tokens/', {
+        vehicle_id: vehicleId,
+        event_type: mode,
+      });
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      setQrToken(res.token);
+      setQrLink(`${origin}/driver/scan/${res.token}`);
+      setStep('qr');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setQrGenerating(false);
+    }
+  }
 
   function reset() {
     setStep('mode');
@@ -100,17 +175,11 @@ export default function EntryPage() {
       <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider">
         <StepDot active={step === 'mode'} done={step !== 'mode'} label="Mode" />
         <span className="text-bone-700">—</span>
-        <StepDot
-          active={step === 'plate'}
-          done={['face', 'result'].includes(step)}
-          label="Plate"
-        />
+        <StepDot active={step === 'plate'} done={['qr','face','result'].includes(step)} label="Plate" />
         <span className="text-bone-700">—</span>
-        <StepDot
-          active={step === 'face'}
-          done={step === 'result'}
-          label="Biometric"
-        />
+        <StepDot active={step === 'qr'} done={['face','result'].includes(step)} label="QR" />
+        <span className="text-bone-700">—</span>
+        <StepDot active={step === 'face'} done={step === 'result'} label="Face" />
         <span className="text-bone-700">—</span>
         <StepDot active={step === 'result'} done={false} label="Result" />
       </div>
@@ -182,17 +251,58 @@ export default function EntryPage() {
               ← Back
             </Button>
             <Button
-              onClick={() => setStep('face')}
+              onClick={generateQR}
+              loading={qrGenerating}
               disabled={!plateImage && !manualPlate.trim()}
               className="ml-auto"
             >
-              Next <ArrowRight className="size-4" />
+              <QrCode className="size-4" /> Generate QR
             </Button>
           </div>
         </section>
       )}
 
       {/* Step: Face */}
+      {/* Step: QR — primary verification */}
+      {step === 'qr' && (
+        <section className="rounded-lg border border-ink-700 bg-ink-800/40 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <QrCode className="size-4 text-amber" />
+            <h2 className="font-display text-base font-semibold text-bone-50">
+              2 · Driver QR verification (primary)
+            </h2>
+          </div>
+          <p className="mb-4 text-xs text-bone-400">
+            Show this QR to the driver. They scan with their phone and verify via passkey (FaceID/fingerprint).
+            Waiting for scan automatically…
+          </p>
+          <div className="flex justify-center">
+            <div className="inline-block rounded-md bg-bone-50 p-3">
+              <QRCodeSVG value={qrLink} size={200} />
+            </div>
+          </div>
+          <p className="mt-3 break-all text-center font-mono text-[10px] text-bone-500">{qrLink}</p>
+          <div className="mt-3 flex items-center justify-center gap-2">
+            <span className="size-1.5 animate-pulse-soft rounded-full bg-amber" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-amber">
+              Waiting for driver to scan…
+            </span>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={() => setStep('plate')} variant="ghost" className="flex-1">
+              ← Back
+            </Button>
+            <Button
+              onClick={() => setStep('face')}
+              variant="ghost"
+              className="flex-1 border-ink-600"
+            >
+              <ScanFace className="size-4" /> QR failed — use face
+            </Button>
+          </div>
+        </section>
+      )}
+
       {step === 'face' && (
         <section className="rounded-lg border border-ink-700 bg-ink-800/40 p-5">
           <div className="mb-4 flex items-center gap-2">
