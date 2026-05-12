@@ -213,7 +213,6 @@ function WeeklyChart({
 }: {
   data: { day: string; granted: number; denied: number }[];
 }) {
-  // Build a 7-day frame even when API returns fewer rows.
   const days: { day: string; granted: number; denied: number }[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
@@ -230,27 +229,33 @@ function WeeklyChart({
   const max = Math.max(...days.map((d) => d.granted + d.denied), 1);
 
   return (
-    <div className="flex h-40 items-end justify-between gap-2.5">
+    <div className="flex h-44 items-end justify-between gap-2">
       {days.map((d, i) => {
         const total = d.granted + d.denied;
-        const totalH = (total / max) * 100;
+        // Minimum 8% height so bars are always visible
+        const totalH = Math.max((total / max) * 100, 8);
         const grantedH = total > 0 ? (d.granted / total) * 100 : 0;
+        const isToday = i === 6;
         return (
           <div key={i} className="flex flex-1 flex-col items-center gap-2">
+            {/* Count label on top */}
+            <span className={`font-mono text-[10px] ${total > 0 ? 'text-bone-300' : 'text-bone-700'}`}>
+              {total > 0 ? total : '·'}
+            </span>
             <div
-              className="relative flex w-full flex-col-reverse overflow-hidden rounded-sm bg-ink-700/50"
-              style={{ height: `${Math.max(totalH, 2)}%` }}
+              className={`relative flex w-full flex-col-reverse overflow-hidden rounded-sm transition-all ${isToday ? 'ring-1 ring-amber/40' : ''}`}
+              style={{ height: `${totalH}%` }}
             >
-              <div
-                className="bg-granted/80"
-                style={{ height: `${grantedH}%` }}
-              />
-              <div
-                className="bg-denied/80"
-                style={{ height: `${100 - grantedH}%` }}
-              />
+              {total === 0 ? (
+                <div className="h-full w-full bg-ink-700/30" />
+              ) : (
+                <>
+                  <div className="bg-granted/70" style={{ height: `${grantedH}%` }} />
+                  <div className="bg-denied/70" style={{ height: `${100 - grantedH}%` }} />
+                </>
+              )}
             </div>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-bone-500">
+            <span className={`font-mono text-[10px] uppercase tracking-wider ${isToday ? 'text-amber' : 'text-bone-500'}`}>
               {d.day}
             </span>
           </div>
