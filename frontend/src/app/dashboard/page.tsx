@@ -229,38 +229,46 @@ function WeeklyChart({
   const max = Math.max(...days.map((d) => d.granted + d.denied), 1);
 
   return (
-    <div className="flex h-44 items-end justify-between gap-2">
-      {days.map((d, i) => {
-        const total = d.granted + d.denied;
-        // Minimum 8% height so bars are always visible
-        const totalH = Math.max((total / max) * 100, 8);
-        const grantedH = total > 0 ? (d.granted / total) * 100 : 0;
-        const isToday = i === 6;
-        return (
-          <div key={i} className="flex flex-1 flex-col items-center gap-2">
-            {/* Count label on top */}
-            <span className={`font-mono text-[10px] ${total > 0 ? 'text-bone-300' : 'text-bone-700'}`}>
-              {total > 0 ? total : '·'}
-            </span>
-            <div
-              className={`relative flex w-full flex-col-reverse overflow-hidden rounded-sm transition-all ${isToday ? 'ring-1 ring-amber/40' : ''}`}
-              style={{ height: `${totalH}%` }}
-            >
-              {total === 0 ? (
-                <div className="h-full w-full bg-ink-700/30" />
-              ) : (
-                <>
-                  <div className="bg-granted/70" style={{ height: `${grantedH}%` }} />
-                  <div className="bg-denied/70" style={{ height: `${100 - grantedH}%` }} />
-                </>
+    <div className="space-y-2">
+      <div className="flex h-32 items-end justify-between gap-2">
+        {days.map((d, i) => {
+          const total = d.granted + d.denied;
+          const pct = total > 0 ? Math.max((total / max) * 100, 15) : 0;
+          const grantedPct = total > 0 ? (d.granted / total) * 100 : 0;
+          const isToday = i === 6;
+          return (
+            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+              {total > 0 && (
+                <span className="font-mono text-[10px] font-bold text-bone-300">{total}</span>
               )}
+              <div className="flex w-full flex-1 flex-col justify-end">
+                {total === 0 ? (
+                  <div className={cn('w-full rounded-sm', isToday ? 'h-1 bg-amber/30' : 'h-0.5 bg-ink-700')} />
+                ) : (
+                  <div
+                    className={cn('relative w-full overflow-hidden rounded-sm transition-all duration-500', isToday ? 'ring-1 ring-amber/50' : '')}
+                    style={{ height: `${pct}%` }}
+                  >
+                    <div className="absolute inset-0 flex flex-col-reverse">
+                      <div className="bg-granted/80 transition-all" style={{ height: `${grantedPct}%` }} />
+                      <div className="bg-denied/80 transition-all" style={{ height: `${100 - grantedPct}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <span className={`font-mono text-[10px] uppercase tracking-wider ${isToday ? 'text-amber' : 'text-bone-500'}`}>
+          );
+        })}
+      </div>
+      <div className="flex justify-between">
+        {days.map((d, i) => (
+          <div key={i} className="flex flex-1 justify-center">
+            <span className={cn('font-mono text-[10px] uppercase tracking-wider', i === 6 ? 'font-bold text-amber' : 'text-bone-500')}>
               {d.day}
             </span>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }
