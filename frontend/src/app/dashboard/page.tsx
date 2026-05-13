@@ -17,7 +17,7 @@ import { Topbar } from '@/components/Topbar';
 import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { apiGet } from '@/lib/api';
-import { Stats, fmtDateTime } from '@/lib/utils';
+import { Stats, fmtDateTime, cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
