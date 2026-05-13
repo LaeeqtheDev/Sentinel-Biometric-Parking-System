@@ -333,7 +333,18 @@ def create_pickup_token(request):
         )
     vehicle = get_object_or_404(Vehicle, pk=vehicle_id)
 
-    pt = PickupToken.issue(vehicle=vehicle, event_type=event_type)
+    # Reuse existing PENDING token if one was created in last 60 seconds
+    # This prevents duplicate QRs from rapid clicks / autonomous mode re-triggers
+    existing = PickupToken.objects.filter(
+        vehicle=vehicle,
+        event_type=event_type,
+        status=PickupToken.Status.PENDING,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first()
+    if existing:
+        pt = existing
+    else:
+        pt = PickupToken.issue(vehicle=vehicle, event_type=event_type)
     base = settings.FRONTEND_BASE_URL.rstrip("/")
     return Response(
         {

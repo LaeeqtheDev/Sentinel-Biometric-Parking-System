@@ -84,7 +84,7 @@ export default function DriverBiometricPage() {
     setEnrolling(true);
     try {
       await apiPost('/biometrics/enroll/', {
-        face_image_base64: faceImage,
+        image_base64: faceImage,
       });
       setSuccess('✓ Face encoding stored. You can use face match as a fallback.');
       setFaceImage(null);

@@ -146,6 +146,21 @@ def verify_entry(request):
     plate_number, ocr_meta = _resolve_plate(request)
     response["plate"] = {"number": plate_number, **ocr_meta}
 
+    # Cooldown: skip if same plate was processed within last 10 seconds
+    # (prevents OCR spam creating duplicate logs)
+    via = request.data.get("via", "")
+    if plate_number and via == "live_camera":
+        from django.utils import timezone
+        from datetime import timedelta
+        recent = AccessLog.objects.filter(
+            plate_detected=plate_number,
+            timestamp__gte=timezone.now() - timedelta(seconds=10),
+            event_type=AccessLog.Event.ENTRY,
+        ).exists()
+        if recent:
+            response["cooldown"] = True
+            return Response(response)
+
     vehicle = (
         Vehicle.objects.filter(plate_number=plate_number, is_active=True)
         .prefetch_related("uservehicle_set__user")

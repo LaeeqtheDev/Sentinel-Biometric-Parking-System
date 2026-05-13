@@ -155,6 +155,14 @@ class ParkingSession(models.Model):
             models.Index(fields=("status",)),
             models.Index(fields=("-entry_time",)),
         ]
+        constraints = [
+            # Prevent two PARKED sessions for the same vehicle at DB level
+            models.UniqueConstraint(
+                fields=["vehicle"],
+                condition=models.Q(status="PARKED"),
+                name="unique_active_session_per_vehicle",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.vehicle.plate_number} [{self.status}] in @ {self.entry_time:%Y-%m-%d %H:%M}"
