@@ -14,5 +14,6 @@ urlpatterns = [
     path("my/<int:vehicle_id>/doc/", views.upload_vehicle_doc, name="upload_vehicle_doc"),
     path("walk-up/", views.walk_up_register, name="walk_up_register"),
     path("pending-approvals/", views.pending_approvals, name="pending_approvals"),
+    path("pending-documents/", views.pending_documents, name="pending_documents"),
     path("", include(router.urls)),
 ]

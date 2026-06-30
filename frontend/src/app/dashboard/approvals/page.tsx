@@ -27,8 +27,18 @@ function fileURL(path: string | null | undefined): string | null {
   return path.startsWith('http') ? path : `${MEDIA_BASE}${path}`;
 }
 
+interface PendingDriverDocs {
+  id: number;
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  driving_license_doc?: string | null;
+  cnic_doc?: string | null;
+}
+
 export default function ApprovalsPage() {
   const [pending, setPending] = useState<Vehicle[]>([]);
+  const [pendingDocs, setPendingDocs] = useState<PendingDriverDocs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -36,8 +46,12 @@ export default function ApprovalsPage() {
     setLoading(true);
     setError('');
     try {
-      const v = await apiGet<Vehicle[]>('/vehicles/pending-approvals/');
+      const [v, d] = await Promise.all([
+        apiGet<Vehicle[]>('/vehicles/pending-approvals/'),
+        apiGet<PendingDriverDocs[]>('/vehicles/pending-documents/'),
+      ]);
       setPending(v);
+      setPendingDocs(d);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -48,6 +62,15 @@ export default function ApprovalsPage() {
   useEffect(() => {
     load();
   }, []);
+
+  async function verifyDriverDocs(userId: number) {
+    try {
+      await apiPost(`/auth/users/${userId}/verify-documents/`, {});
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
 
   async function approve(id: number) {
     try {
@@ -79,6 +102,9 @@ export default function ApprovalsPage() {
         <div className="flex items-center justify-between">
           <p className="font-mono text-[11px] uppercase tracking-wider text-bone-500">
             {pending.length} vehicle{pending.length !== 1 ? 's' : ''} pending
+            {pendingDocs.length > 0 && (
+              <> · {pendingDocs.length} driver doc{pendingDocs.length !== 1 ? 's' : ''} pending</>
+            )}
           </p>
           <Button onClick={load} variant="ghost" size="sm">
             <RefreshCw className="size-3.5" /> Refresh
@@ -91,19 +117,67 @@ export default function ApprovalsPage() {
           </div>
         )}
 
+        {/* Drivers who uploaded personal documents but have no vehicle yet */}
+        {pendingDocs.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="font-mono text-[11px] uppercase tracking-widest text-bone-500">
+              Driver documents awaiting verification
+            </h3>
+            <ul className="grid gap-3 lg:grid-cols-2">
+              {pendingDocs.map((u) => {
+                const licDoc = fileURL(u.driving_license_doc);
+                const cnicDoc = fileURL(u.cnic_doc);
+                return (
+                  <li
+                    key={u.id}
+                    className="rounded-lg border border-amber/30 bg-amber/5 p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-bone-100">
+                          {u.first_name} {u.last_name}
+                          <span className="ml-1.5 text-bone-500">@{u.username}</span>
+                        </p>
+                        <p className="font-mono text-[10px] uppercase tracking-wider text-bone-500">
+                          No vehicle registered yet
+                        </p>
+                      </div>
+                      <Button
+                        onClick={() => verifyDriverDocs(u.id)}
+                        size="sm"
+                        variant="primary"
+                      >
+                        <CheckCircle2 className="size-3.5" /> Verify
+                      </Button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <DocCard label="Driver licence" href={licDoc} />
+                      <DocCard label="CNIC / ID" href={cnicDoc} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         {loading ? (
           <div className="rounded-lg border border-ink-700 bg-ink-800/40 p-8 text-center text-bone-500">
             Loading…
           </div>
-        ) : pending.length === 0 ? (
+        ) : pending.length === 0 && pendingDocs.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-ink-700 bg-ink-800/20 p-12 text-center">
             <CheckCircle2 className="mx-auto size-10 text-granted" />
             <p className="mt-3 font-medium text-bone-200">All caught up!</p>
             <p className="mt-1 text-sm text-bone-500">
-              No vehicles waiting for approval.
+              No vehicles or documents waiting for approval.
             </p>
           </div>
-        ) : (
+        ) : pending.length > 0 ? (
+          <section className="space-y-3">
+            <h3 className="font-mono text-[11px] uppercase tracking-widest text-bone-500">
+              Vehicles awaiting approval
+            </h3>
           <ul className="grid gap-4 lg:grid-cols-2">
             {pending.map((v) => {
               const driverDoc = v.assignments?.[0]?.user_detail;
@@ -211,7 +285,8 @@ export default function ApprovalsPage() {
               );
             })}
           </ul>
-        )}
+          </section>
+        ) : null}
       </main>
     </>
   );

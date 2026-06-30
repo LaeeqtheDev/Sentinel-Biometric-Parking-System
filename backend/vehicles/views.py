@@ -79,7 +79,7 @@ class VehicleViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
-        """Move an UNDER_REVIEW vehicle to ACTIVE."""
+        """Move an UNDER_REVIEW vehicle to ACTIVE and verify the linked driver's documents."""
         vehicle = self.get_object()
         if vehicle.status != Vehicle.Status.UNDER_REVIEW:
             return Response(
@@ -88,6 +88,16 @@ class VehicleViewSet(viewsets.ModelViewSet):
             )
         vehicle.status = Vehicle.Status.ACTIVE
         vehicle.save(update_fields=["status"])
+
+        # Also mark documents_verified for any linked user who has uploaded
+        # both their driving licence and CNIC — approving the vehicle is the
+        # admin's signal that they've reviewed the driver's compliance too.
+        for link in vehicle.uservehicle_set.select_related("user").all():
+            u = link.user
+            if u.driving_license_doc and u.cnic_doc and not u.documents_verified:
+                u.documents_verified = True
+                u.save(update_fields=["documents_verified"])
+
         return Response(VehicleSerializer(vehicle).data)
 
     @action(detail=False, methods=["get"], url_path=r"lookup/(?P<plate>[^/.]+)")
@@ -266,6 +276,29 @@ def pending_approvals(request):
         .order_by("-created_at")
     )
     return Response(VehicleSerializer(qs, many=True).data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdminRole])
+def pending_documents(request):
+    """
+    Drivers who have uploaded at least one personal document (driving
+    licence or CNIC) but are not yet documents_verified — regardless of
+    whether they own a vehicle. This catches drivers who only uploaded
+    docs without registering a car, who would otherwise never appear
+    anywhere for admin review.
+    """
+    from django.db.models import Q
+    from accounts.serializers import UserSerializer
+    from accounts.models import User
+
+    qs = (
+        User.objects.filter(role=User.Role.DRIVER, documents_verified=False)
+        .filter(Q(driving_license_doc__isnull=False) & ~Q(driving_license_doc="")
+                | Q(cnic_doc__isnull=False) & ~Q(cnic_doc=""))
+        .order_by("-id")
+    )
+    return Response(UserSerializer(qs, many=True).data)
 
 
 @api_view(["POST"])
