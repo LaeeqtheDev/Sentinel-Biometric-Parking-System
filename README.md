@@ -6,10 +6,6 @@ with **device-based biometric verification (WebAuthn passkeys)** plus a
 **face-recognition fallback** to control access to a parking lot, and
 tracks every vehicle's stay as a parking session.
 
-> **Group · Fall-2025-09**
-> Muhammad Abdul Basit Malik · Zainab Riaz Ahmed · Orooj Fatima
-> Advisor · Ma'am Sadaf Ali
-
 ---
 
 ## Architecture
