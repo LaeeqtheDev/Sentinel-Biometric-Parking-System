@@ -227,35 +227,36 @@ function WeeklyChart({
   }
 
   const max = Math.max(...days.map((d) => d.granted + d.denied), 1);
+  const CHART_HEIGHT_PX = 128; // matches h-32
 
   return (
     <div className="space-y-2">
-      <div className="flex h-32 items-end justify-between gap-2">
+      <div className="flex items-end justify-between gap-2" style={{ height: CHART_HEIGHT_PX }}>
         {days.map((d, i) => {
           const total = d.granted + d.denied;
-          const pct = total > 0 ? Math.max((total / max) * 100, 15) : 0;
-          const grantedPct = total > 0 ? (d.granted / total) * 100 : 0;
+          const barPx = total > 0 ? Math.max((total / max) * CHART_HEIGHT_PX, 18) : 2;
+          const grantedPx = total > 0 ? (d.granted / total) * barPx : 0;
+          const deniedPx = total > 0 ? barPx - grantedPx : 0;
           const isToday = i === 6;
           return (
-            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+            <div key={i} className="flex flex-1 flex-col items-center justify-end gap-1" style={{ height: CHART_HEIGHT_PX }}>
               {total > 0 && (
                 <span className="font-mono text-[10px] font-bold text-bone-300">{total}</span>
               )}
-              <div className="flex w-full flex-1 flex-col justify-end">
-                {total === 0 ? (
-                  <div className={cn('w-full rounded-sm', isToday ? 'h-1 bg-amber/30' : 'h-0.5 bg-ink-700')} />
-                ) : (
-                  <div
-                    className={cn('relative w-full overflow-hidden rounded-sm transition-all duration-500', isToday ? 'ring-1 ring-amber/50' : '')}
-                    style={{ height: `${pct}%` }}
-                  >
-                    <div className="absolute inset-0 flex flex-col-reverse">
-                      <div className="bg-granted/80 transition-all" style={{ height: `${grantedPct}%` }} />
-                      <div className="bg-denied/80 transition-all" style={{ height: `${100 - grantedPct}%` }} />
-                    </div>
-                  </div>
-                )}
-              </div>
+              {total === 0 ? (
+                <div
+                  className={cn('w-full rounded-sm', isToday ? 'bg-amber/30' : 'bg-ink-700')}
+                  style={{ height: 2 }}
+                />
+              ) : (
+                <div
+                  className={cn('flex w-full flex-col-reverse overflow-hidden rounded-sm transition-all duration-500', isToday ? 'ring-1 ring-amber/50' : '')}
+                  style={{ height: barPx }}
+                >
+                  <div className="w-full bg-granted/80" style={{ height: grantedPx }} />
+                  <div className="w-full bg-denied/80" style={{ height: deniedPx }} />
+                </div>
+              )}
             </div>
           );
         })}
@@ -269,6 +270,7 @@ function WeeklyChart({
           </div>
         ))}
       </div>
+
     </div>
   );
 }
