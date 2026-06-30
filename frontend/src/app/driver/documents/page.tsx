@@ -96,6 +96,9 @@ export default function DriverDocumentsPage() {
   const licenseURL = fileURL(user?.driving_license_doc);
   const cnicURL = fileURL(user?.cnic_doc);
   const verified = user?.documents_verified;
+  const pendingVehicles = vehicles.filter((v) => v.status === 'UNDER_REVIEW');
+  const activeVehicles = vehicles.filter((v) => v.status === 'ACTIVE');
+  const blockedVehicles = vehicles.filter((v) => v.status === 'BLOCKED');
 
   return (
     <div className="space-y-6">
@@ -105,20 +108,59 @@ export default function DriverDocumentsPage() {
         <p className="mt-2 text-sm text-bone-400">Upload your ID documents and vehicle registration for admin verification.</p>
       </div>
 
-      {/* Verification status */}
+      {/* Personal ID verification status */}
       <div className={cn('rounded-lg border p-4', verified ? 'border-granted/40 bg-granted/5' : 'border-amber/40 bg-amber/5')}>
         <div className="flex items-start gap-3">
           {verified ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-granted" /> : <Clock className="mt-0.5 size-5 shrink-0 text-amber" />}
           <div>
             <p className={cn('text-sm font-medium', verified ? 'text-granted' : 'text-amber')}>
-              {verified ? 'Documents verified' : 'Pending verification'}
+              {verified ? 'Identity documents verified' : 'Identity documents pending verification'}
             </p>
             <p className="text-xs text-bone-400">
-              {verified ? 'Admin approved your documents.' : 'Admin will review shortly.'}
+              {verified
+                ? 'Your driving licence and CNIC have been approved by admin. This does not affect your vehicle approval status — see below.'
+                : 'Admin will review your driving licence and CNIC shortly.'}
             </p>
           </div>
         </div>
       </div>
+
+      {/* Vehicle approval status — separate from personal docs */}
+      {vehicles.length > 0 && (
+        <div className={cn(
+          'rounded-lg border p-4',
+          blockedVehicles.length > 0 ? 'border-denied/40 bg-denied/5'
+          : pendingVehicles.length > 0 ? 'border-amber/40 bg-amber/5'
+          : 'border-granted/40 bg-granted/5'
+        )}>
+          <div className="flex items-start gap-3">
+            {blockedVehicles.length > 0 ? (
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-denied" />
+            ) : pendingVehicles.length > 0 ? (
+              <Clock className="mt-0.5 size-5 shrink-0 text-amber" />
+            ) : (
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-granted" />
+            )}
+            <div className="flex-1">
+              <p className={cn(
+                'text-sm font-medium',
+                blockedVehicles.length > 0 ? 'text-denied' : pendingVehicles.length > 0 ? 'text-amber' : 'text-granted'
+              )}>
+                {blockedVehicles.length > 0 ? 'Vehicle blocked'
+                  : pendingVehicles.length > 0 ? 'Vehicle pending approval'
+                  : 'Vehicle approved'}
+              </p>
+              <p className="text-xs text-bone-400">
+                {pendingVehicles.length > 0
+                  ? `${pendingVehicles.map(v => v.plate_number).join(', ')} ${pendingVehicles.length > 1 ? 'are' : 'is'} still under admin review and cannot use the gate yet.`
+                  : blockedVehicles.length > 0
+                  ? `${blockedVehicles.map(v => v.plate_number).join(', ')} ${blockedVehicles.length > 1 ? 'are' : 'is'} blocked by admin.`
+                  : 'Your vehicle is active and approved for gate access.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div className="flex items-start gap-2 rounded-md border border-denied/30 bg-denied/10 px-3 py-2 text-sm text-denied"><AlertCircle className="mt-0.5 size-4 shrink-0" />{error}</div>}
       {success && <div className="flex items-start gap-2 rounded-md border border-granted/30 bg-granted/10 px-3 py-2 text-sm text-granted"><CheckCircle2 className="mt-0.5 size-4 shrink-0" />{success}</div>}

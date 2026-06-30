@@ -164,7 +164,7 @@ export default function DriverHomePage() {
             </span>
           </div>
           <ul className="mt-1 space-y-1.5">
-            <ComplianceRow ok={docsVerified} label="Documents verified" href="/driver/documents" />
+            <ComplianceRow ok={docsVerified} label="Identity docs verified" href="/driver/documents" />
             <ComplianceRow ok={hasBiometric} label="Biometric enrolled" href="/driver/biometric" />
             <ComplianceRow
               ok={pendingVehicles === 0 && vehicles.length > 0}
