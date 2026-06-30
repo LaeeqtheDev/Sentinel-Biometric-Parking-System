@@ -718,7 +718,7 @@ function DetectionItem({
           {det.decisionLog.no_biometric_enrolled && det.decisionLog.decision === 'DENIED' && (
             <div className="mt-2 rounded border border-amber/30 bg-amber/5 px-2 py-2">
               <p className="mb-1.5 text-[10px] text-amber">No biometric enrolled — gate-registered driver</p>
-              <Button onClick={() => adminOverrideExitLive(det)} size="sm" variant="primary" className="w-full">
+              <Button onClick={() => onAdminOverride()} size="sm" variant="primary" className="w-full">
                 <CheckCircle2 className="size-3" /> Admin override exit
               </Button>
             </div>
