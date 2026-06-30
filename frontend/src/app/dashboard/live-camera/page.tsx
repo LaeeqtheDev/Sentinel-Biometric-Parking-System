@@ -220,10 +220,12 @@ export default function LiveCameraPage() {
   async function adminOverrideExitLive(det: Detection) {
     setError('');
     try {
-      const res = await apiPost<any>('/access/verify-exit/', {
+      const event = det.suggested_event || det.gate;
+      const endpoint = event === 'EXIT' ? '/access/verify-exit/' : '/access/verify-entry/';
+      const res = await apiPost<any>(endpoint, {
         plate_number: det.plate,
-        via: 'live_camera_admin_override',
-        gate: 'EXIT_CAM',
+        via: event === 'EXIT' ? 'live_camera_admin_override_exit' : 'live_camera_admin_override_entry',
+        gate: det.gate === 'EXIT' ? 'EXIT_CAM' : 'ENTRY_CAM',
         admin_override: true,
       });
       triggerGateAnimation(det.id, res.decision, res.reason);
@@ -719,7 +721,7 @@ function DetectionItem({
             <div className="mt-2 rounded border border-amber/30 bg-amber/5 px-2 py-2">
               <p className="mb-1.5 text-[10px] text-amber">No biometric enrolled — gate-registered driver</p>
               <Button onClick={() => onAdminOverride()} size="sm" variant="primary" className="w-full">
-                <CheckCircle2 className="size-3" /> Admin override exit
+                <CheckCircle2 className="size-3" /> Admin override — {det.suggested_event === 'EXIT' || det.gate === 'EXIT' ? 'release vehicle' : 'grant entry'}
               </Button>
             </div>
           )}

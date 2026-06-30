@@ -245,6 +245,19 @@ def verify_entry(request):
     bio_ok = bool(bio.get("matched"))
     auth_ok = webauthn_match or bio_ok
 
+    # Check if driver has NO biometric at all (gate-registered walk-in)
+    no_biometric_enrolled = False
+    if bio_target_user:
+        has_face = bio_target_user.has_biometric
+        from passkeys.models import WebAuthnCredential
+        has_passkey = WebAuthnCredential.objects.filter(user=bio_target_user).exists()
+        no_biometric_enrolled = not has_face and not has_passkey
+
+    # Admin override: if explicitly set AND no biometric exists, allow entry
+    admin_override = request.data.get("admin_override", False)
+    if admin_override and no_biometric_enrolled:
+        auth_ok = True
+
     # ---- Risk engine ---------------------------------------------------- #
     from .risk_engine import RiskInputs, compute_risk, recent_failure_count, is_off_hours_now
     from parking.models import PolicyConfig
@@ -306,9 +319,16 @@ def verify_entry(request):
     elif response.get("auto_granted_low_risk"):
         reason = "Trusted vehicle, low risk — auto-granted (no biometric required)."
     elif not auth_ok:
-        reason = bio.get("reason") or "Driver identity could not be verified."
+        if no_biometric_enrolled:
+            reason = "No biometric enrolled — use admin override to grant entry."
+        else:
+            reason = bio.get("reason") or "Driver identity could not be verified."
+    elif admin_override and no_biometric_enrolled:
+        reason = "Admin override entry — driver has no biometric enrolled (gate-registered walk-in)."
     else:
         reason = "Vehicle registered and driver identity verified."
+
+    response["no_biometric_enrolled"] = no_biometric_enrolled
 
     plate_image_bytes = _read_image(request, "plate_image")
     log = _persist(
