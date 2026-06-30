@@ -130,6 +130,7 @@ export default function DriverPickupPage() {
         plate_number: session.vehicle_detail.plate_number,
         webauthn_user_id: auth.user_id,
         via: 'driver_app',
+        gate: 'DRIVER_APP_PICKUP',
       });
 
       setResult(res);
@@ -157,6 +158,7 @@ export default function DriverPickupPage() {
         plate_number: selectedSession.vehicle_detail.plate_number,
         face_image_base64: faceImage,
         via: 'driver_app_face',
+        gate: 'DRIVER_APP_PICKUP',
       });
       setResult(res);
       setPhase(res.decision === 'GRANTED' ? 'success' : 'denied');

@@ -139,6 +139,7 @@ export default function EntryPage() {
       const payload: any = {
         face_image_base64: faceImage || undefined,
         via: manualPlate.trim() ? 'manual_plate_entry' : 'manual',
+        gate: 'MANUAL_GATE',
       };
       if (manualPlate.trim()) {
         payload.plate_number = manualPlate.trim();

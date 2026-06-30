@@ -102,6 +102,7 @@ export default function LogsPage() {
                 <tr className="border-b border-ink-700 bg-ink-900/40 text-left">
                   <Th>Timestamp</Th>
                   <Th>Plate</Th>
+                  <Th>Gate</Th>
                   <Th>User</Th>
                   <Th>Plate ✓</Th>
                   <Th>Bio ✓</Th>
@@ -111,14 +112,14 @@ export default function LogsPage() {
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-sm text-bone-500">
+                    <td colSpan={7} className="py-12 text-center text-sm text-bone-500">
                       Loading…
                     </td>
                   </tr>
                 )}
                 {!loading && logs.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-16 text-center">
+                    <td colSpan={7} className="py-16 text-center">
                       <div className="flex flex-col items-center gap-3 text-bone-500">
                         <ScrollText className="size-8 opacity-50" />
                         <p className="text-sm">No log entries match.</p>
@@ -143,6 +144,11 @@ export default function LogsPage() {
                     <Td>
                       <span className="rounded border border-ink-600 bg-ink-900 px-2 py-0.5 font-mono text-xs font-semibold tracking-wider text-bone-100">
                         {log.plate_detected}
+                      </span>
+                    </Td>
+                    <Td>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-bone-500">
+                        {(log as any).gate || '—'}
                       </span>
                     </Td>
                     <Td>

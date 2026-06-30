@@ -203,7 +203,7 @@ export default function LiveCameraPage() {
     try {
       const event = det.suggested_event || det.gate;
       const endpoint = event === 'EXIT' ? '/access/verify-exit/' : '/access/verify-entry/';
-      const res = await apiPost<any>(endpoint, { plate_number: det.plate, via: 'live_camera' });
+      const res = await apiPost<any>(endpoint, { plate_number: det.plate, via: 'live_camera', gate: det.gate === 'EXIT' ? 'EXIT_CAM' : 'ENTRY_CAM' });
       triggerGateAnimation(det.id, res.decision, res.reason);
     } catch (e: any) { setError(e.message); }
   }
@@ -499,7 +499,7 @@ function CameraPanel({
     if (!shot) return;
     setBusy(true);
     try {
-      const res = await apiPost<any>('/access/live-detect/', { plate_image_base64: shot });
+      const res = await apiPost<any>('/access/live-detect/', { plate_image_base64: shot, gate: role });
       // Push detection IF backend returned anything interesting
       const hasSomething = res.plate || (res.candidates && res.candidates.length > 0) || res.face?.detected;
       if (hasSomething) {

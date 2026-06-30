@@ -145,6 +145,7 @@ def verify_entry(request):
     response: dict = {"event_type": "ENTRY"}
     plate_number, ocr_meta = _resolve_plate(request)
     response["plate"] = {"number": plate_number, **ocr_meta}
+    gate = (request.data.get("gate") or "")[:20]
 
     # Cooldown: skip if same plate was processed within last 10 seconds
     # (prevents OCR spam creating duplicate logs)
@@ -627,6 +628,8 @@ def live_detect(request):
     # If conditions allow, perform the access action immediately.
     if can_auto_grant and not recent:
         event_type = AccessLog.Event.EXIT if session else AccessLog.Event.ENTRY
+        gate = (request.data.get("gate") or "").upper()
+        gate_label = "EXIT_CAM" if gate == "EXIT" else "ENTRY_CAM" if gate == "ENTRY" else (gate[:20] or "")
         log = AccessLog.objects.create(
             event_type=event_type,
             plate_detected=plate,
@@ -639,6 +642,7 @@ def live_detect(request):
             webauthn_match=False,
             confidence=AccessLog.Confidence.HIGH if confidence == "high" else AccessLog.Confidence.MEDIUM,
             via="autonomous",
+            gate=gate_label,
         )
         if event_type == AccessLog.Event.ENTRY:
             ParkingSession.objects.create(
@@ -826,6 +830,7 @@ def _persist(
         webauthn_match=webauthn_ok,
         confidence=confidence if confidence else AccessLog.Confidence.NONE,
         via=request.data.get("via", "manual"),
+        gate=(request.data.get("gate") or "")[:20],
     )
     if snapshot_bytes:
         log.snapshot.save(

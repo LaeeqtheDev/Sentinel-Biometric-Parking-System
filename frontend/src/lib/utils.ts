@@ -72,6 +72,7 @@ export interface AccessLog {
   biometric_distance: number | null;
   confidence: 'high' | 'medium' | 'low' | 'none';
   via: string;
+  gate: string;
   snapshot: string | null;
   timestamp: string;
 }

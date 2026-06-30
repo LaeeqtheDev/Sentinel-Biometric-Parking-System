@@ -69,6 +69,12 @@ class AccessLog(models.Model):
         default="manual",
         help_text="manual | live_camera | mobile_pickup | kiosk",
     )
+    gate = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Which physical gate/camera caught this event, e.g. ENTRY_CAM, EXIT_CAM, MANUAL_GATE",
+    )
 
     snapshot = models.ImageField(upload_to="access_snapshots/", null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)

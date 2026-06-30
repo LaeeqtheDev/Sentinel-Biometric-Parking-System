@@ -28,6 +28,7 @@ class AccessLogSerializer(serializers.ModelSerializer):
             "biometric_distance",
             "confidence",
             "via",
+            "gate",
             "snapshot",
             "timestamp",
         )
