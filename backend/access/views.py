@@ -398,6 +398,22 @@ def verify_exit(request):
     bio_ok = bool(bio.get("matched"))
     auth_ok = webauthn_match or bio_ok
 
+    # Check if this driver has NO biometric enrolled at all (face + passkey).
+    # This happens when a driver was registered at the gate on the spot —
+    # they never went through normal onboarding so they have nothing to verify with.
+    # In this case we allow exit but flag it clearly for the admin to see.
+    no_biometric_enrolled = False
+    if bio_target_user:
+        has_face = bio_target_user.has_biometric
+        from passkeys.models import WebAuthnCredential
+        has_passkey = WebAuthnCredential.objects.filter(user=bio_target_user).exists()
+        no_biometric_enrolled = not has_face and not has_passkey
+
+    # Admin override: if explicitly requested AND no biometric exists, allow exit
+    admin_override = request.data.get("admin_override", False)
+    if admin_override and no_biometric_enrolled:
+        auth_ok = True
+
     if not plate_ok:
         decision = AccessLog.Decision.DENIED
         reason = (
@@ -410,11 +426,18 @@ def verify_exit(request):
         reason = "No active parking session for this vehicle (was it ever parked?)."
     elif not auth_ok:
         decision = AccessLog.Decision.DENIED
-        reason = bio.get("reason") or "Driver identity could not be verified."
+        if no_biometric_enrolled:
+            reason = "No biometric enrolled — use admin override to release this vehicle."
+        else:
+            reason = bio.get("reason") or "Driver identity could not be verified."
     else:
         decision = AccessLog.Decision.GRANTED
-        reason = "Vehicle and driver identity verified – exit allowed."
+        if admin_override and no_biometric_enrolled:
+            reason = "Admin override exit — driver has no biometric enrolled (gate-registered walk-in)."
+        else:
+            reason = "Vehicle and driver identity verified – exit allowed."
 
+    response["no_biometric_enrolled"] = no_biometric_enrolled
     plate_image_bytes = _read_image(request, "plate_image")
     log = _persist(
         request,

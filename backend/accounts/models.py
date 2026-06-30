@@ -59,6 +59,10 @@ class User(AbstractUser):
         default=False,
         help_text="Admin has reviewed driving licence + CNIC and confirmed identity.",
     )
+    gate_registered = models.BooleanField(
+        default=False,
+        help_text="Account was created at the gate by admin — no biometric enrollment done yet.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:

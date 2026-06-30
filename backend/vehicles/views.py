@@ -387,6 +387,7 @@ def walk_up_register(request):
             cnic=driver_payload.get("cnic", ""),
             email=driver_payload.get("email", ""),
             role=User.Role.DRIVER,
+            gate_registered=True,  # no biometric enrolled yet
         )
 
     if driver:

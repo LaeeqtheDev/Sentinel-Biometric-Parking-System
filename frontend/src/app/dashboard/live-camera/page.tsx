@@ -54,7 +54,7 @@ interface Detection {
   active_session?: { id: number; entry_time: string } | null;
   suggested_event?: GateRole;
   timestamp: number;
-  decisionLog?: { decision: string; reason: string };
+  decisionLog?: { decision: string; reason: string; no_biometric_enrolled?: boolean };
   snapshot?: string;
   candidates?: { text: string; score: number; engine: string }[];
   face?: FaceMatch;
@@ -204,6 +204,28 @@ export default function LiveCameraPage() {
       const event = det.suggested_event || det.gate;
       const endpoint = event === 'EXIT' ? '/access/verify-exit/' : '/access/verify-entry/';
       const res = await apiPost<any>(endpoint, { plate_number: det.plate, via: 'live_camera', gate: det.gate === 'EXIT' ? 'EXIT_CAM' : 'ENTRY_CAM' });
+      // If denied because no biometric enrolled, update detection with override flag
+      if (res.decision === 'DENIED' && res.no_biometric_enrolled) {
+        setDetections((prev) => prev.map((d) =>
+          d.id === det.id
+            ? { ...d, decisionLog: { decision: 'DENIED', reason: res.reason || '', no_biometric_enrolled: true } }
+            : d
+        ));
+      } else {
+        triggerGateAnimation(det.id, res.decision, res.reason);
+      }
+    } catch (e: any) { setError(e.message); }
+  }
+
+  async function adminOverrideExitLive(det: Detection) {
+    setError('');
+    try {
+      const res = await apiPost<any>('/access/verify-exit/', {
+        plate_number: det.plate,
+        via: 'live_camera_admin_override',
+        gate: 'EXIT_CAM',
+        admin_override: true,
+      });
       triggerGateAnimation(det.id, res.decision, res.reason);
     } catch (e: any) { setError(e.message); }
   }
@@ -401,6 +423,7 @@ export default function LiveCameraPage() {
                   onAct={() => actOn(det)}
                   onSendQR={() => sendToPhone(det)}
                   onWalkUp={() => openWalkUp(det)}
+                  onAdminOverride={() => adminOverrideExitLive(det)}
                   onPickAlt={(t) => { setEditValue(t); setEditingId(det.id); }}
                 />
               ))}
@@ -599,12 +622,13 @@ function CameraPanel({
 function DetectionItem({
   det, isEditing, editValue, setEditValue,
   onStartEdit, onCommitEdit, onCancelEdit,
-  onAct, onSendQR, onWalkUp, onPickAlt,
+  onAct, onSendQR, onWalkUp, onPickAlt, onAdminOverride,
 }: {
   det: Detection; isEditing: boolean; editValue: string;
   setEditValue: (v: string) => void;
   onStartEdit: () => void; onCommitEdit: () => void; onCancelEdit: () => void;
   onAct: () => void; onSendQR: () => void; onWalkUp: () => void;
+  onAdminOverride: () => void;
   onPickAlt: (text: string) => void;
 }) {
   return (
@@ -691,6 +715,14 @@ function DetectionItem({
             {det.decisionLog.decision === 'GRANTED' ? <CheckCircle2 className="mr-1 inline size-3" /> : <XCircle className="mr-1 inline size-3" />}
             {det.decisionLog.reason}
           </div>
+          {det.decisionLog.no_biometric_enrolled && det.decisionLog.decision === 'DENIED' && (
+            <div className="mt-2 rounded border border-amber/30 bg-amber/5 px-2 py-2">
+              <p className="mb-1.5 text-[10px] text-amber">No biometric enrolled — gate-registered driver</p>
+              <Button onClick={() => adminOverrideExitLive(det)} size="sm" variant="primary" className="w-full">
+                <CheckCircle2 className="size-3" /> Admin override exit
+              </Button>
+            </div>
+          )}
           {det.gatePhase && <GateAnimation phase={det.gatePhase} />}
         </>
       ) : det.registered && det.fresh ? (

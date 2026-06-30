@@ -36,6 +36,7 @@ interface DecisionResult {
   biometric?: { matched: boolean; reason?: string };
   webauthn?: { matched: boolean };
   session_found?: boolean;
+  no_biometric_enrolled?: boolean;
   log_id: number;
   timestamp: string;
 }
@@ -150,6 +151,27 @@ export default function EntryPage() {
       const res = await apiPost<DecisionResult>(endpoint, payload);
       setResult(res);
       setStep('result');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function adminOverrideExit() {
+    if (!result) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload: any = {
+        via: 'manual_admin_override',
+        gate: 'MANUAL_GATE',
+        admin_override: true,
+      };
+      if (manualPlate.trim()) payload.plate_number = manualPlate.trim();
+      if (plateImage) payload.plate_image_base64 = plateImage;
+      const res = await apiPost<DecisionResult>('/access/verify-exit/', payload);
+      setResult(res);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -340,7 +362,7 @@ export default function EntryPage() {
 
       {/* Step: Result */}
       {step === 'result' && result && (
-        <ResultPanel result={result} onReset={reset} />
+        <ResultPanel result={result} onReset={reset} onAdminOverride={adminOverrideExit} overriding={submitting} />
       )}
     </div>
   );
@@ -437,9 +459,13 @@ function ModeCard({
 function ResultPanel({
   result,
   onReset,
+  onAdminOverride,
+  overriding,
 }: {
   result: DecisionResult;
   onReset: () => void;
+  onAdminOverride?: () => void;
+  overriding?: boolean;
 }) {
   const granted = result.decision === 'GRANTED';
   // Local animation state — drive the gate phases when granted
@@ -520,6 +546,27 @@ function ResultPanel({
               />
             )}
           </dl>
+
+          {/* Admin override for gate-registered drivers with no biometric */}
+          {!granted && result.no_biometric_enrolled && result.event_type === 'EXIT' && onAdminOverride && (
+            <div className="mt-4 rounded-lg border border-amber/40 bg-amber/5 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-amber">
+                · No biometric on file
+              </p>
+              <p className="mt-1 text-sm text-bone-300">
+                This driver was registered at the gate and has not enrolled a passkey or face yet.
+                As admin you can release the vehicle manually.
+              </p>
+              <Button
+                onClick={onAdminOverride}
+                loading={overriding}
+                variant="primary"
+                className="mt-3"
+              >
+                <CheckCircle2 className="size-4" /> Admin override — release vehicle
+              </Button>
+            </div>
+          )}
 
           <Button onClick={onReset} className="mt-5">
             <RefreshCw className="size-4" /> New verification
