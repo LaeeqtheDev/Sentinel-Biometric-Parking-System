@@ -307,7 +307,7 @@ export default function LiveCameraPage() {
       });
       setDetections((prev) => prev.map((d) =>
         d.id === walkUpFor.id
-          ? { ...d, plate: plate.toUpperCase(), registered: true, decisionLog: { decision: 'GRANTED', reason: 'Vehicle registered. Click ENTRY.' } }
+          ? { ...d, plate: plate.toUpperCase(), registered: true, fresh: true, decisionLog: undefined, suggested_event: 'ENTRY' }
           : d
       ));
       setWalkUpFor(null);
