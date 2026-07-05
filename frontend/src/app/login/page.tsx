@@ -167,7 +167,7 @@ export default function LoginPage() {
               Default seeded admin
             </p>
             <p className="mt-1 font-mono text-xs text-bone-300">
-              admin · admin12345
+              Administrator · Admin12345
             </p>
             <p className="mt-1 text-[11px] text-bone-500">
               See README for setup steps.
