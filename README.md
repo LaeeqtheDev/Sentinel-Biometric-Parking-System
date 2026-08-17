@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Oracle_Cloud-F80000?style=for-the-badge&logo=oracle&logoColor=white" alt="Oracle Cloud">
 </p>
 
-<p align="center"><em>Final-Year Project — The University of Lahore</em></p>
+
 
 ---
 
