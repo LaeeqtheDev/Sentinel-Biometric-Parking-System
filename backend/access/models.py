@@ -86,6 +86,9 @@ class AccessLog(models.Model):
             models.Index(fields=("status",)),
             models.Index(fields=("event_type",)),
             models.Index(fields=("plate_detected",)),
+            # recent_failure_count / incident detection: plate + status + time window
+            models.Index(fields=("plate_detected", "status", "timestamp"), name="accesslog_plate_status_ts"),
+            models.Index(fields=("user", "-timestamp"), name="accesslog_user_ts"),
         ]
 
     def __str__(self) -> str:
@@ -166,6 +169,7 @@ class Incident(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [models.Index(fields=("resolved", "-created_at"), name="incident_open_idx")]
 
     def __str__(self) -> str:
         return f"[{self.severity}] {self.reason[:60]}"

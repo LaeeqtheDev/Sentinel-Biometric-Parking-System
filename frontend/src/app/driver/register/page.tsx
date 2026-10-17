@@ -45,8 +45,8 @@ export default function DriverRegisterPage() {
     setError('');
 
     // basic client-side validation
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
     if (form.password !== form.confirm) {
@@ -183,7 +183,7 @@ export default function DriverRegisterPage() {
             onChange={(e) => update('password', e.target.value)}
             required
             autoComplete="new-password"
-            placeholder="At least 6 characters"
+            placeholder="At least 8 characters"
           />
 
           <Input

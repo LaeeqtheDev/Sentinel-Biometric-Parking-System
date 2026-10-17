@@ -12,4 +12,5 @@ urlpatterns = [
         name="parking_active_for_plate",
     ),
     path("policy/", policy_views.policy_config, name="policy_config"),
+    path("occupancy/", views.lot_occupancy, name="lot_occupancy"),
 ]

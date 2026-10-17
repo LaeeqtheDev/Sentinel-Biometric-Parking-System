@@ -520,7 +520,9 @@ function CameraPanel({
 
   const tick = useCallback(async () => {
     if (!active || busy || !webcamRef.current) return;
-    const shot = webcamRef.current.getScreenshot();
+    // Send a bounded frame: full-resolution webcam stills were 1-3 MB of
+    // base64 every 2.5 s per camera. 1280 px wide is plenty for plate OCR.
+    const shot = webcamRef.current.getScreenshot({ width: 1280, height: 720 });
     if (!shot) return;
     setBusy(true);
     try {
@@ -602,7 +604,7 @@ function CameraPanel({
             ref={webcamRef}
             audio={false}
             screenshotFormat="image/jpeg"
-            screenshotQuality={0.92}
+            screenshotQuality={0.8}
             videoConstraints={deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'environment' }}
             className="h-full w-full object-cover"
           />

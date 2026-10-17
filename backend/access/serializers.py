@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
+from core.files import SignedFileField
 from vehicles.serializers import VehicleSerializer
 
 from .models import AccessLog
@@ -9,6 +10,7 @@ from .models import AccessLog
 class AccessLogSerializer(serializers.ModelSerializer):
     vehicle_detail = VehicleSerializer(source="vehicle", read_only=True)
     user_detail = UserSerializer(source="user", read_only=True)
+    snapshot = SignedFileField()
 
     class Meta:
         model = AccessLog

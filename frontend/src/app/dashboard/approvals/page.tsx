@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Topbar } from '@/components/Topbar';
 import { Button } from '@/components/Button';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
 import { Vehicle, fmtDateTime, cn } from '@/lib/utils';
 
 const MEDIA_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(
@@ -36,8 +36,17 @@ interface PendingDriverDocs {
   cnic_doc?: string | null;
 }
 
+interface PendingClaim {
+  id: number;
+  relationship: string;
+  created_at: string;
+  vehicle: { id: number; plate_number: string; make: string; model: string; status: string };
+  user: { id: number; username: string; first_name: string; last_name: string; documents_verified: boolean };
+}
+
 export default function ApprovalsPage() {
   const [pending, setPending] = useState<Vehicle[]>([]);
+  const [claims, setClaims] = useState<PendingClaim[]>([]);
   const [pendingDocs, setPendingDocs] = useState<PendingDriverDocs[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,12 +55,14 @@ export default function ApprovalsPage() {
     setLoading(true);
     setError('');
     try {
-      const [v, d] = await Promise.all([
+      const [v, d, c] = await Promise.all([
         apiGet<Vehicle[]>('/vehicles/pending-approvals/'),
         apiGet<PendingDriverDocs[]>('/vehicles/pending-documents/'),
+        apiGet<PendingClaim[]>('/vehicles/pending-claims/'),
       ]);
       setPending(v);
       setPendingDocs(d);
+      setClaims(c);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -66,6 +77,25 @@ export default function ApprovalsPage() {
   async function verifyDriverDocs(userId: number) {
     try {
       await apiPost(`/auth/users/${userId}/verify-documents/`, {});
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  async function approveClaim(c: PendingClaim) {
+    try {
+      await apiPost(`/vehicles/${c.vehicle.id}/assignments/${c.id}/approve/`, {});
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
+  async function rejectClaim(c: PendingClaim) {
+    if (!confirm(`Reject @${c.user.username}'s request to use ${c.vehicle.plate_number}?`)) return;
+    try {
+      await apiDelete(`/vehicles/${c.vehicle.id}/assignments/${c.id}/`);
       load();
     } catch (e: any) {
       setError(e.message);
@@ -115,6 +145,55 @@ export default function ApprovalsPage() {
           <div className="rounded-md border border-denied/30 bg-denied/10 px-3 py-2 text-sm text-denied">
             {error}
           </div>
+        )}
+
+        {/* Drivers asking to be linked to an already-registered plate */}
+        {claims.length > 0 && (
+          <section className="space-y-3">
+            <h3 className="font-mono text-[11px] uppercase tracking-widest text-bone-500">
+              Requests to use an existing vehicle ({claims.length})
+            </h3>
+            <p className="text-xs text-bone-500">
+              These drivers typed a plate that is already registered. They get no access to the
+              car until you approve. Check with the owner first.
+            </p>
+            <ul className="space-y-2">
+              {claims.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex flex-col gap-3 rounded-lg border border-amber/20 bg-ink-800/40 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="size-4 shrink-0 text-amber" />
+                    <div>
+                      <p className="text-sm text-bone-50">
+                        <span className="font-medium">@{c.user.username}</span>
+                        {(c.user.first_name || c.user.last_name) && (
+                          <span className="text-bone-400"> ({c.user.first_name} {c.user.last_name})</span>
+                        )}{' '}
+                        wants to drive{' '}
+                        <span className="font-mono font-semibold tracking-wider text-amber">
+                          {c.vehicle.plate_number}
+                        </span>
+                      </p>
+                      <p className="font-mono text-[10px] text-bone-500">
+                        {fmtDateTime(c.created_at)} · documents{' '}
+                        {c.user.documents_verified ? 'verified' : 'not verified'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => approveClaim(c)}>
+                      <CheckCircle2 className="size-3.5" /> Approve
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => rejectClaim(c)}>
+                      <XCircle className="size-3.5" /> Reject
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* Drivers who uploaded personal documents but have no vehicle yet */}

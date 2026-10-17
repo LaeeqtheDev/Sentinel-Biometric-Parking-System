@@ -1,11 +1,14 @@
 from rest_framework import serializers
 
+from core.files import SignedFileField
+
 from .models import BiometricProfile
 
 
 class BiometricProfileSerializer(serializers.ModelSerializer):
     has_encoding = serializers.SerializerMethodField()
     user_username = serializers.CharField(source="user.username", read_only=True)
+    reference_image = SignedFileField()
 
     class Meta:
         model = BiometricProfile

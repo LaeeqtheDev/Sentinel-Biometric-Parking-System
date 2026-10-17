@@ -124,11 +124,11 @@ export default function DriverPickupPage() {
     setError('');
     try {
       const auth = await authenticatePasskey(user!.username);
-      if (!auth.matched) throw new Error('Passkey verification failed.');
+      if (!auth.matched || !auth.passkey_ticket) throw new Error('Passkey verification failed.');
 
       const res = await apiPost<any>('/access/verify-exit/', {
         plate_number: session.vehicle_detail.plate_number,
-        webauthn_user_id: auth.user_id,
+        passkey_ticket: auth.passkey_ticket,
         via: 'driver_app',
         gate: 'DRIVER_APP_PICKUP',
       });

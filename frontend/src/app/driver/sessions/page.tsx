@@ -112,6 +112,11 @@ export default function DriverSessionsPage() {
                     <span className="font-mono text-bone-300">
                       {fmtDuration(s.duration_seconds)}
                     </span>
+                    {s.fee_amount != null && (
+                      <span className="ml-auto font-mono text-amber">
+                        {s.fee_currency} {s.fee_amount}
+                      </span>
+                    )}
                   </div>
                 )}
               </dl>

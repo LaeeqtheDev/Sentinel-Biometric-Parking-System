@@ -1,14 +1,20 @@
 """Serializers for accounts: register, list, detail, JWT login."""
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from core.files import SignedFileField
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
     has_biometric = serializers.BooleanField(read_only=True)
+    # Identity documents are private: rendered as short-lived signed links.
+    driving_license_doc = SignedFileField()
+    cnic_doc = SignedFileField()
 
     class Meta:
         model = User
@@ -43,7 +49,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = User
@@ -58,6 +64,18 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "cnic",
             "role",
         )
+
+    def validate(self, attrs):
+        # Run Django's password validators (length, common, numeric,
+        # similarity). The old serializer only checked min_length=6.
+        candidate = User(
+            username=attrs.get("username", ""),
+            email=attrs.get("email", ""),
+            first_name=attrs.get("first_name", ""),
+            last_name=attrs.get("last_name", ""),
+        )
+        validate_password(attrs.get("password", ""), user=candidate)
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop("password")
@@ -79,10 +97,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        data["user"] = UserSerializer(self.user).data
+        data["user"] = UserSerializer(self.user, context=self.context).data
         return data
 
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)
-    new_password = serializers.CharField(required=True, min_length=6)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate_new_password(self, value):
+        validate_password(value, user=self.context.get("user"))
+        return value

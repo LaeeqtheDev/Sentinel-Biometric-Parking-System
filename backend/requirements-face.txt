@@ -1,0 +1,4 @@
+# Optional: face-recognition fallback (install on RECOGNITION workers only).
+# Needs cmake + a C++ toolchain, or use dlib-bin wheels on Windows.
+dlib==19.24.6
+face-recognition==1.3.0

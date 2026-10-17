@@ -91,6 +91,8 @@ export interface ParkingSession {
   exit_time: string | null;
   duration_seconds: number | null;
   status: 'PARKED' | 'EXITED';
+  fee_amount?: string | null;
+  fee_currency?: string;
 }
 
 export interface Stats {

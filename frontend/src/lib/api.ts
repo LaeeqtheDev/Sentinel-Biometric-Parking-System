@@ -40,29 +40,44 @@ export class ApiError extends Error {
   }
 }
 
+// Single-flight refresh: when several requests hit 401 at once they share
+// one refresh call. The backend rotates refresh tokens and blacklists the
+// old one, so parallel refreshes would otherwise log the user out.
+let refreshInFlight: Promise<string | null> | null = null;
+
 async function refreshAccess(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
   const refresh = tokenStore.getRefresh();
   if (!refresh) return null;
-  try {
-    const res = await fetch(`${API_URL}/auth/refresh/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    tokenStore.set(data.access);
-    return data.access;
-  } catch {
-    return null;
-  }
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${API_URL}/auth/refresh/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      tokenStore.set(data.access, data.refresh); // refresh is rotated
+      return data.access as string;
+    } catch {
+      return null;
+    } finally {
+      setTimeout(() => (refreshInFlight = null), 0);
+    }
+  })();
+  return refreshInFlight;
 }
 
 interface ApiOptions extends Omit<RequestInit, 'body'> {
   body?: any;
   isFormData?: boolean;
   skipAuth?: boolean;
-  /** Number of times to retry on 5xx / network errors. Default 2. */
+  /**
+   * Retries on network errors / 502-504. Default: 2 for GET/HEAD, 0 for
+   * everything else. Gate actions (POST) must never be silently replayed:
+   * a retried verify-exit could act twice.
+   */
   retries?: number;
 }
 
@@ -73,7 +88,16 @@ export async function api<T = any>(
   opts: ApiOptions = {},
 ): Promise<T> {
   const url = path.startsWith('http') ? path : `${API_URL}${path}`;
-  const { body, isFormData, skipAuth, headers, retries = 2, ...rest } = opts;
+  const method = (opts.method || 'GET').toUpperCase();
+  const idempotent = method === 'GET' || method === 'HEAD';
+  const {
+    body,
+    isFormData,
+    skipAuth,
+    headers,
+    retries = idempotent ? 2 : 0,
+    ...rest
+  } = opts;
 
   const buildHeaders = (token: string | null): HeadersInit => {
     const h: Record<string, string> = { ...((headers as any) || {}) };
@@ -116,11 +140,9 @@ export async function api<T = any>(
         null,
       );
     }
-    // Retry on 502/503/504 (server transient failures) and 500 (sometimes)
-    if (
-      [500, 502, 503, 504].includes(response.status) &&
-      attempt < retries
-    ) {
+    // Retry transient gateway failures only (not 500: that is a real bug
+    // and replaying it just repeats the side effect).
+    if ([502, 503, 504].includes(response.status) && attempt < retries) {
       await sleep(300 * Math.pow(2, attempt));
       attempt++;
       continue;
@@ -150,9 +172,16 @@ export async function api<T = any>(
   }
 
   if (!response.ok) {
+    const firstFieldError =
+      data && typeof data === 'object' && !data.detail
+        ? Object.values(data).flat().find((v) => typeof v === 'string')
+        : null;
     const msg =
-      (data && (data.detail || data.message)) ||
-      `Request failed (${response.status})`;
+      response.status === 429
+        ? 'Too many attempts. Please wait a moment and try again.'
+        : (data && (data.detail || data.message)) ||
+          (firstFieldError as string) ||
+          `Request failed (${response.status})`;
     throw new ApiError(msg, response.status, data);
   }
 

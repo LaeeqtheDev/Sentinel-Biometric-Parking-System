@@ -13,14 +13,15 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.decorators import api_view, parser_classes, permission_classes
+from rest_framework.decorators import api_view, parser_classes, permission_classes, throttle_classes
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.models import User
-from accounts.permissions import IsAdminRole
-from recognition.face_engine import encode_face, verify_face
+from accounts.permissions import IsAdminRole, is_admin
+from core.throttling import GateThrottle
+from recognition import service as recog
 
 from .models import BiometricProfile
 from .serializers import BiometricProfileSerializer
@@ -54,7 +55,7 @@ def enroll(request):
     # Drivers can only enroll themselves.
     user_id = request.data.get("user_id") or request.data.get("user")
 
-    if request.user.role == "ADMIN":
+    if is_admin(request.user):
         if not user_id:
             return Response({"detail": "user_id is required."}, status=400)
         user = get_object_or_404(User, pk=user_id)
@@ -68,7 +69,17 @@ def enroll(request):
             status=400,
         )
 
-    encoding = encode_face(img_bytes)
+    if not recog.face_available():
+        return Response(
+            {"detail": "Face recognition is not available on this deployment. Use a passkey."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    try:
+        encoding = recog.encode_for_storage(img_bytes)
+    except recog.RecognitionError as exc:
+        return Response({"detail": str(exc)}, status=400)
+    except recog.RecognitionUnavailable as exc:
+        return Response({"detail": str(exc)}, status=503)
     if encoding is None:
         return Response(
             {"detail": "No face detected in the image. Try again with a clearer photo."},
@@ -76,14 +87,17 @@ def enroll(request):
         )
 
     profile, _ = BiometricProfile.objects.get_or_create(user=user)
+    old_image = profile.reference_image.name if profile.reference_image else None
     profile.encoding = encoding
-    profile.reference_image.save(filename, ContentFile(img_bytes), save=False)
+    profile.reference_image.save(f"ref_{user.id}.jpg", ContentFile(recog.prepare_image(img_bytes)), save=False)
     profile.save()
+    if old_image and old_image != profile.reference_image.name:
+        profile.reference_image.storage.delete(old_image)  # don't keep stale face photos
 
     return Response(
         {
             "detail": "Biometric enrolled successfully.",
-            "profile": BiometricProfileSerializer(profile).data,
+            "profile": BiometricProfileSerializer(profile, context={"request": request}).data,
         },
         status=status.HTTP_201_CREATED,
     )
@@ -95,12 +109,18 @@ def enroll(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, JSONParser])
+@throttle_classes([GateThrottle])
 def verify(request):
-    user_id = request.data.get("user_id") or request.data.get("user")
-    if not user_id:
-        return Response({"detail": "user_id is required."}, status=400)
-
-    user = get_object_or_404(User, pk=user_id)
+    # Drivers can only test against their OWN enrolment. Previously any
+    # logged-in user could submit photos against any user_id and use the
+    # distance score as a face-matching oracle.
+    if is_admin(request.user):
+        user_id = request.data.get("user_id") or request.data.get("user")
+        if not user_id:
+            return Response({"detail": "user_id is required."}, status=400)
+        user = get_object_or_404(User, pk=user_id)
+    else:
+        user = request.user
     profile = getattr(user, "biometric", None)
     if not profile or not profile.encoding:
         return Response(
@@ -112,7 +132,12 @@ def verify(request):
     if not img_bytes:
         return Response({"detail": "Image is required."}, status=400)
 
-    result = verify_face(img_bytes, bytes(profile.encoding))
+    try:
+        result = recog.verify_face(img_bytes, bytes(profile.encoding))
+    except recog.RecognitionError as exc:
+        return Response({"detail": str(exc)}, status=400)
+    except recog.RecognitionUnavailable as exc:
+        return Response({"detail": str(exc)}, status=503)
     result["user_id"] = user.id
     result["username"] = user.username
     return Response(result)
@@ -131,4 +156,4 @@ def profile_detail(request, user_id: int):
             {"detail": "No biometric profile.", "user_id": user_id, "has_encoding": False},
             status=status.HTTP_404_NOT_FOUND,
         )
-    return Response(BiometricProfileSerializer(profile).data)
+    return Response(BiometricProfileSerializer(profile, context={"request": request}).data)

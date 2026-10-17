@@ -1,0 +1,78 @@
+# Full stack for staging / a single production host.
+#   cp backend/.env.example backend/.env   (fill it in)
+#   docker compose up -d --build
+#   docker compose exec api python manage.py seed_admin
+#
+# Scale horizontally:
+#   docker compose up -d --scale api=3 --scale worker=4
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  migrate:
+    build: ./backend
+    env_file: backend/.env
+    command: ["python", "manage.py", "migrate", "--no-input"]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  api:
+    build: ./backend
+    env_file: backend/.env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    ports: ["8000:8000"]
+    volumes: [media:/app/media]   # only used when no S3 bucket is configured
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz/').status==200 else 1)"]
+      interval: 15s
+      retries: 5
+
+  worker:
+    build:
+      context: ./backend
+      args: { WITH_FACE: "1" }
+    env_file: backend/.env
+    command: ["celery", "-A", "core", "worker", "-Q", "recognition,default", "-c", "2", "--loglevel=info"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    volumes: [media:/app/media]
+
+  beat:
+    build: ./backend
+    env_file: backend/.env
+    command: ["celery", "-A", "core", "beat", "--loglevel=info"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  redisdata:
+  media:

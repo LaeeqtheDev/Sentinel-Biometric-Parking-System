@@ -53,23 +53,35 @@ def bytes_to_encoding(blob: bytes) -> np.ndarray:
 # ---------------------------------------------------------------------- #
 #  Public API
 # ---------------------------------------------------------------------- #
-def encode_face(file_bytes: bytes) -> Optional[bytes]:
+def encode_face_vector(file_bytes: bytes) -> Optional[list]:
     """
-    Detect the (single) most prominent face in an image and return its 128-d
-    encoding as raw bytes ready for the database.  Returns None if no face is
-    detected.
+    128-d encoding of the largest face as a plain list (JSON-safe, so it can
+    travel back from a Celery worker). None if no face or dlib unavailable.
     """
+    if not FACE_RECOGNITION_AVAILABLE:
+        return None
     image = _load_image(file_bytes)
     locations = face_recognition.face_locations(image, model="hog")
     if not locations:
+        locations = face_recognition.face_locations(
+            image, number_of_times_to_upsample=2, model="hog"
+        )
+    if not locations:
         return None
-
-    # Use the largest detected face.
+    # Use the largest detected face (closest to the camera).
     locations.sort(key=lambda r: (r[2] - r[0]) * (r[1] - r[3]), reverse=True)
     encodings = face_recognition.face_encodings(image, [locations[0]])
     if not encodings:
         return None
-    return encoding_to_bytes(encodings[0])
+    return encodings[0].astype(np.float64).tolist()
+
+
+def encode_face(file_bytes: bytes) -> Optional[bytes]:
+    """Encoding as raw bytes for the database. None if no face detected."""
+    vec = encode_face_vector(file_bytes)
+    if vec is None:
+        return None
+    return encoding_to_bytes(np.asarray(vec))
 
 
 def verify_face(file_bytes: bytes, stored_encoding_bytes: bytes) -> dict:

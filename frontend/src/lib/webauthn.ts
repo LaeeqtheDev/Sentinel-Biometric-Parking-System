@@ -38,6 +38,8 @@ export async function authenticatePasskey(username: string): Promise<{
   matched: boolean;
   user_id?: number;
   username?: string;
+  /** Single-use, ~60 s proof of passkey identity. Send it to the gate. */
+  passkey_ticket?: string;
 }> {
   const options = await apiPost<any>(
     '/passkeys/auth/options/',

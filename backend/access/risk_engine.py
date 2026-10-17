@@ -54,14 +54,15 @@ class RiskResult:
         self.score = max(0, min(100, self.score + delta))
 
 
-def compute_risk(inputs: RiskInputs) -> RiskResult:
+def compute_risk(inputs: RiskInputs, cfg=None) -> RiskResult:
     """
     Score starts at 50 (neutral).  Each signal pushes it up (riskier) or
     down (safer).  Final score is clamped to [0, 100].
     """
-    from parking.models import PolicyConfig
+    if cfg is None:
+        from parking.models import PolicyConfig
 
-    cfg = PolicyConfig.current()
+        cfg = PolicyConfig.current()
     res = RiskResult(score=50, band="MEDIUM")
 
     # ---- Plate detection signals -----------------------------------------
@@ -158,6 +159,7 @@ def recent_failure_count(plate: str, minutes: int = 10) -> int:
 
 
 def is_off_hours_now() -> bool:
-    """11pm–5am is off-hours by convention."""
-    h = timezone.localtime().hour
-    return h >= 23 or h < 5
+    """Off-hours window now comes from PolicyConfig (default 23:00-05:00)."""
+    from parking.models import PolicyConfig
+
+    return PolicyConfig.current().is_off_hours_now()

@@ -77,6 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    const refreshToken = tokenStore.getRefresh();
+    if (refreshToken) {
+      // Revoke server-side so a copied refresh token stops working.
+      apiPost('/auth/logout/', { refresh: refreshToken }, { skipAuth: true }).catch(() => {});
+    }
     tokenStore.clear();
     setUser(null);
     router.push('/login');

@@ -82,8 +82,12 @@ class User(AbstractUser):
 
     @property
     def has_biometric(self) -> bool:
-        # Lazy reverse-lookup; biometrics app provides the related model.
-        return hasattr(self, "biometric") and self.biometric.encoding is not None
+        # Querysets that list users select_related("biometric"), so this is
+        # served from memory instead of one query per user.
+        try:
+            return self.biometric.encoding is not None
+        except Exception:  # RelatedObjectDoesNotExist
+            return False
 
     def recompute_trust_level(self, save: bool = True) -> str:
         """Map trust_score → trust_level using the configured thresholds."""

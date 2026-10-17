@@ -113,7 +113,7 @@ export default function NewUserPage() {
                 type="password"
                 value={form.password}
                 onChange={(e) => update('password', e.target.value)}
-                hint="Minimum 6 characters"
+                hint="Minimum 8 characters, not all numbers"
                 required
                 autoComplete="new-password"
               />

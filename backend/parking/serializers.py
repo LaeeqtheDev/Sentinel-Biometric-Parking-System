@@ -33,5 +33,8 @@ class ParkingSessionSerializer(serializers.ModelSerializer):
             "exit_time",
             "duration_seconds",
             "status",
+            "fee_amount",
+            "fee_currency",
+            "fee_breakdown",
         )
         read_only_fields = fields

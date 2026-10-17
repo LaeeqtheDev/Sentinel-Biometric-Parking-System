@@ -9,6 +9,7 @@ import {
   Shield,
   ToggleRight,
   CheckCircle2,
+  Wallet,
 } from 'lucide-react';
 import { Topbar } from '@/components/Topbar';
 import { Button } from '@/components/Button';
@@ -31,6 +32,13 @@ interface PolicyConfig {
   ocr_min_confidence_peak: string;
   risk_low_max: number;
   risk_medium_max: number;
+  off_hours_start?: string;
+  off_hours_end?: string;
+  capacity: number;
+  currency: string;
+  hourly_rate: string;
+  peak_hourly_rate: string;
+  grace_minutes: number;
   updated_at: string | null;
 }
 
@@ -231,6 +239,66 @@ export default function PolicyConfigPage() {
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </Select>
+            </Section>
+
+            {/* Capacity + pricing */}
+            <Section icon={Wallet} title="Capacity & pricing">
+              <p className="text-xs text-bone-400">
+                Entries are refused when the lot is full (0 = unlimited). Fees are pro-rated per
+                minute: peak minutes at the peak rate, the rest at the normal rate.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  type="number"
+                  min={0}
+                  label="Total spots"
+                  value={cfg.capacity}
+                  onChange={(e) => update('capacity', Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                <Input
+                  label="Currency"
+                  value={cfg.currency}
+                  maxLength={3}
+                  onChange={(e) => update('currency', e.target.value.toUpperCase())}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  label="Hourly rate"
+                  value={cfg.hourly_rate}
+                  onChange={(e) => update('hourly_rate', e.target.value)}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  label="Peak hourly rate"
+                  value={cfg.peak_hourly_rate}
+                  onChange={(e) => update('peak_hourly_rate', e.target.value)}
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  label="Free grace (minutes)"
+                  value={cfg.grace_minutes}
+                  onChange={(e) => update('grace_minutes', Math.max(0, parseInt(e.target.value) || 0))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  type="time"
+                  label="Off-hours start"
+                  value={cfg.off_hours_start || '23:00'}
+                  onChange={(e) => update('off_hours_start', e.target.value)}
+                />
+                <Input
+                  type="time"
+                  label="Off-hours end"
+                  value={cfg.off_hours_end || '05:00'}
+                  onChange={(e) => update('off_hours_end', e.target.value)}
+                />
+              </div>
             </Section>
           </div>
         )}

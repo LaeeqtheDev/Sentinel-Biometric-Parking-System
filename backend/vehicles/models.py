@@ -38,24 +38,18 @@ def plate_canonical(plate: str) -> str:
 
 def fuzzy_find_vehicle(plate_text: str):
     """
-    Look up a Vehicle by plate using fuzzy matching.
-    Tries exact normalized match first, then canonical-form match.
-    Returns the matched Vehicle or None.
+    Look up a Vehicle by plate.
+
+    Uses the indexed `plate_canonical` column, so this is a single index
+    lookup at any fleet size. (The old version loaded every Vehicle row into
+    Python and compared them one by one on every camera frame.)
     """
     if not plate_text:
         return None
-    norm = normalize_plate(plate_text)
     canonical = plate_canonical(plate_text)
-    # Fast path — exact normalized match
-    v = Vehicle.objects.filter(plate_number=norm).first()
-    if v:
-        return v
-    # Fuzzy path — strip punctuation from every plate and compare in Python
-    # (small DBs, FYP scale; for prod you'd add a normalized column + index)
-    for v in Vehicle.objects.all():
-        if plate_canonical(v.plate_number) == canonical:
-            return v
-    return None
+    if not canonical:
+        return None
+    return Vehicle.objects.filter(plate_canonical=canonical).first()
 
 
 class Vehicle(models.Model):
@@ -72,6 +66,10 @@ class Vehicle(models.Model):
         UNDER_REVIEW = "UNDER_REVIEW", "Under review"
 
     plate_number = models.CharField(max_length=20, unique=True, db_index=True)
+    # Punctuation-free form used for matching OCR output ("AAP-1478" and
+    # "AAP 1478" both become "AAP1478"). Unique so two records can never
+    # describe the same physical plate.
+    plate_canonical = models.CharField(max_length=20, unique=True, editable=False)
     vehicle_type = models.CharField(
         max_length=10, choices=VehicleType.choices, default=VehicleType.CAR
     )
@@ -100,39 +98,55 @@ class Vehicle(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [models.Index(fields=["status"], name="vehicle_status_idx")]
 
     def save(self, *args, **kwargs):
         self.plate_number = normalize_plate(self.plate_number)
+        self.plate_canonical = plate_canonical(self.plate_number)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "plate_number" in update_fields:
+            kwargs["update_fields"] = set(update_fields) | {"plate_canonical"}
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return self.plate_number
 
-    # ----- Convenience accessors (used by older code paths) ----- #
+    # ----- Convenience accessors ----- #
+    # These read the prefetched `uservehicle_set` when it is available, so
+    # listing N vehicles costs one extra query in total rather than 2N.
+    def _links(self):
+        return [uv for uv in self.uservehicle_set.all() if uv.approved]
+
     @property
     def owners(self):
-        return User.objects.filter(
-            uservehicle__vehicle=self,
-            uservehicle__relationship__in=[
-                UserVehicle.Relationship.OWNER,
-                UserVehicle.Relationship.BOTH,
-            ],
-        )
+        return [
+            uv.user
+            for uv in self._links()
+            if uv.relationship in (UserVehicle.Relationship.OWNER, UserVehicle.Relationship.BOTH)
+        ]
 
     @property
     def drivers(self):
-        return User.objects.filter(
-            uservehicle__vehicle=self,
-            uservehicle__relationship__in=[
-                UserVehicle.Relationship.DRIVER,
-                UserVehicle.Relationship.BOTH,
-            ],
-        )
+        return [
+            uv.user
+            for uv in self._links()
+            if uv.relationship in (UserVehicle.Relationship.DRIVER, UserVehicle.Relationship.BOTH)
+        ]
 
     @property
     def primary_user(self):
-        """Best-effort 'who is responsible for this car' – first owner, then driver."""
-        return self.owners.first() or self.drivers.first()
+        """Best-effort 'who is responsible for this car': first owner, then driver."""
+        owners = self.owners
+        if owners:
+            return owners[0]
+        drivers = self.drivers
+        return drivers[0] if drivers else None
+
+    def is_authorized_user(self, user) -> bool:
+        """True when `user` has an APPROVED link to this vehicle."""
+        if not user or not getattr(user, "pk", None):
+            return False
+        return UserVehicle.objects.filter(vehicle=self, user=user, approved=True).exists()
 
 
 class UserVehicle(models.Model):
@@ -150,6 +164,11 @@ class UserVehicle(models.Model):
         choices=Relationship.choices,
         default=Relationship.DRIVER,
     )
+    # A driver claiming a plate that is already registered to someone else
+    # gets an UNAPPROVED link. It grants nothing until an admin approves it.
+    # (Previously the claim was linked immediately, which let anyone attach
+    # themselves to any car and then unlock it at the exit.)
+    approved = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -158,3 +177,16 @@ class UserVehicle(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.username} ↔ {self.vehicle.plate_number} ({self.relationship})"
+
+
+def assignments_prefetch(prefix: str = ""):
+    """
+    Prefetch for serializing vehicles: assignments + their users + each
+    user's biometric row, in two queries total for any number of vehicles.
+    Use as `.prefetch_related(assignments_prefetch())`, or with a prefix
+    (e.g. "vehicle__") when serializing objects that point at a vehicle.
+    """
+    return models.Prefetch(
+        f"{prefix}uservehicle_set",
+        queryset=UserVehicle.objects.select_related("user", "user__biometric"),
+    )

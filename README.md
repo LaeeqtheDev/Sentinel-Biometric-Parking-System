@@ -116,6 +116,18 @@ Every gate action, including admin overrides, writes to `AccessLog` with actor a
 
 ---
 
+## Production deployment (Docker)
+
+```bash
+cp backend/.env.example backend/.env      # fill in secrets, hosts, URLs
+docker compose up -d --build              # Postgres, Redis, API, workers, beat, frontend
+docker compose exec api python manage.py seed_admin --password '<strong password>'
+docker compose up -d --scale api=3 --scale worker=4   # scale out
+```
+
+Health checks: `/healthz` (liveness) and `/readyz` (database + cache). See `CHANGES.md`
+for the full list of security, design and scalability changes.
+
 ## Deployment Notes
 
 The development defaults in this README are **not production settings**. Before exposing an instance:

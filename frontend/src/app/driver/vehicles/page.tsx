@@ -45,29 +45,15 @@ export default function DriverVehiclesPage() {
     if (!form.plate_number.trim()) return;
     setAdding(true); setError(''); setSuccess('');
     try {
-      const token = tokenStore.getAccess();
-      let res: Response;
+      let data: any;
       if (regDoc) {
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
         fd.append('registration_doc', regDoc);
-        res = await fetch(`${API_URL}/vehicles/my/add/`, {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: fd,
-        });
+        data = await apiPost<any>('/vehicles/my/add/', fd, { isFormData: true });
       } else {
-        res = await fetch(`${API_URL}/vehicles/my/add/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(form),
-        });
+        data = await apiPost<any>('/vehicles/my/add/', form);
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Add failed');
       setSuccess(data.message || 'Vehicle added — pending approval.');
       setForm({ plate_number: '', make: '', model: '', color: '', vehicle_type: 'CAR' });
       setRegDoc(null);
@@ -89,13 +75,8 @@ export default function DriverVehiclesPage() {
     if (!assigningFor || !assignUsername.trim()) return;
     setAssigning(true);
     try {
-      // Look up user then create assignment via admin endpoint
-      // We use walk-up endpoint with existing vehicle + driver_id lookup by username
-      const users = await apiGet<any[]>(`/auth/users/?search=${assignUsername.trim()}`);
-      const match = users.find((u: any) => u.username === assignUsername.trim());
-      if (!match) throw new Error(`User "${assignUsername}" not found.`);
-      await apiPost(`/vehicles/${assigningFor.id}/assignments/`, {
-        user_id: match.id,
+      await apiPost(`/vehicles/my/${assigningFor.id}/drivers/`, {
+        username: assignUsername.trim(),
         relationship: 'DRIVER',
       });
       setSuccess(`@${assignUsername} added as driver.`);
@@ -165,6 +146,11 @@ export default function DriverVehiclesPage() {
                         {v.status.toLowerCase().replace('_', ' ')}
                       </span>
                     </p>
+                    {(v as any).my_link_pending && (
+                      <p className="mt-1 font-mono text-[10px] text-amber">
+                        Your link to this plate is awaiting admin approval
+                      </p>
+                    )}
                     {/* Linked users */}
                     {v.assignments && v.assignments.length > 0 && (
                       <p className="mt-1 font-mono text-[10px] text-bone-500">

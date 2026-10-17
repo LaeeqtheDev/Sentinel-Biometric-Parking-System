@@ -1,7 +1,8 @@
 from rest_framework import serializers
 
-from accounts.serializers import UserSerializer
 from accounts.models import User
+from accounts.serializers import UserSerializer
+from core.files import SignedFileField
 
 from .models import Vehicle, UserVehicle, normalize_plate
 
@@ -11,8 +12,8 @@ class UserVehicleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserVehicle
-        fields = ("id", "user", "user_detail", "relationship", "created_at")
-        read_only_fields = ("id", "created_at", "user_detail")
+        fields = ("id", "user", "user_detail", "relationship", "approved", "created_at")
+        read_only_fields = ("id", "created_at", "user_detail", "approved")
 
 
 class VehicleSerializer(serializers.ModelSerializer):
@@ -23,6 +24,7 @@ class VehicleSerializer(serializers.ModelSerializer):
     )
     owners_detail = UserSerializer(source="owners", many=True, read_only=True)
     drivers_detail = UserSerializer(source="drivers", many=True, read_only=True)
+    registration_doc = SignedFileField()
 
     class Meta:
         model = Vehicle
@@ -75,7 +77,15 @@ class VehicleCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
 
     def validate_plate_number(self, value: str) -> str:
-        return normalize_plate(value)
+        from .models import plate_canonical
+
+        value = normalize_plate(value)
+        clash = Vehicle.objects.filter(plate_canonical=plate_canonical(value))
+        if self.instance is not None:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError("A vehicle with this plate already exists.")
+        return value
 
     def create(self, validated_data):
         assignments = validated_data.pop("assignments", [])
@@ -103,5 +113,5 @@ class VehicleCreateSerializer(serializers.ModelSerializer):
             except User.DoesNotExist:
                 continue
             UserVehicle.objects.update_or_create(
-                user=user, vehicle=vehicle, defaults={"relationship": rel}
+                user=user, vehicle=vehicle, defaults={"relationship": rel, "approved": True}
             )
