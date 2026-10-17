@@ -107,12 +107,12 @@ export default function LandingPage() {
         {/* ---------------- Hero ---------------- */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 border-grid opacity-30 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-2 lg:pb-28 lg:pt-24">
+          <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14 lg:pb-28 lg:pt-24">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-amber">
                 · Autonomous parking access
               </p>
-              <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-bone-50 text-balance sm:text-5xl lg:text-6xl">
+              <h1 className="mt-5 font-display text-4xl font-semibold leading-[1.05] tracking-tight text-bone-50 text-balance sm:text-5xl lg:text-[3.5rem]">
                 The gate knows the car.
                 <br />
                 <span className="text-amber-glow">The phone proves the driver.</span>
